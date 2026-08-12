@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Contact Us — {{ store.store_name }}{% endblock %}
+{% block content %}
+<div class="container page-section" style="max-width:760px;">
+  <h1 class="section-title">Contact Us</h1>
+  <div class="card">
+    <p><strong>WhatsApp:</strong> <a href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener">Chat with us</a></p>
+    <p><strong>Instagram:</strong> <a href="{{ store.instagram_url }}" target="_blank" rel="noopener">{{ store.instagram_url }}</a></p>
+    {% if store.contact_email %}<p><strong>Email:</strong> <a href="mailto:{{ store.contact_email }}">{{ store.contact_email }}</a></p>{% endif %}
+    {% if store.contact_address %}<p><strong>Address:</strong> {{ store.contact_address }}</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

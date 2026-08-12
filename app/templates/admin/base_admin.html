@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Admin — {{ store.store_name }}{% endblock %}</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="/static/icons/favicon.svg">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="admin-body">
+  <div class="admin-shell">
+    <aside class="admin-sidebar" id="admin-sidebar">
+      <div class="admin-sidebar__brand">🎁 {{ store.store_name }}</div>
+      <nav aria-label="Admin navigation">
+        <a href="/admin" class="{{ 'active' if active_nav == 'dashboard' else '' }}">📊 Dashboard</a>
+        <a href="/admin/orders" class="{{ 'active' if active_nav == 'orders' else '' }}">📦 Orders <span id="new-order-badge"></span></a>
+        <a href="/admin/products" class="{{ 'active' if active_nav == 'products' else '' }}">🧸 Products</a>
+        <a href="/admin/categories" class="{{ 'active' if active_nav == 'categories' else '' }}">🗂️ Categories</a>
+        <a href="/admin/settings" class="{{ 'active' if active_nav == 'settings' else '' }}">⚙️ Settings</a>
+        <a href="/admin/logout">🚪 Log Out</a>
+        <a href="/" target="_blank" rel="noopener">🔗 View Store</a>
+      </nav>
+    </aside>
+    <div class="admin-main">
+      <div class="admin-topbar">
+        <button class="admin-mobile-toggle" id="admin-menu-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="admin-sidebar">☰</button>
+        <strong>{% block page_title %}Dashboard{% endblock %}</strong>
+        <span></span>
+      </div>
+      <div class="admin-content">
+        {% block admin_content %}{% endblock %}
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var toggle = document.getElementById('admin-menu-toggle');
+      var sidebar = document.getElementById('admin-sidebar');
+      if (toggle && sidebar) {
+        toggle.addEventListener('click', function () {
+          var isOpen = sidebar.classList.toggle('open');
+          toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+      }
+
+      // New-order badge: polled on an interval rather than pushed, so it
+      // works with zero notification infrastructure. Core admin flows
+      // (viewing/updating orders) never depend on this succeeding.
+      var badge = document.getElementById('new-order-badge');
+      function refreshBadge() {
+        fetch('/admin/api/new-order-count', { headers: { Accept: 'application/json' } })
+          .then(function (res) { return res.ok ? res.json() : null; })
+          .then(function (data) {
+            if (!data || !badge) return;
+            badge.innerHTML = data.count > 0 ? '<span class="notif-badge">' + data.count + '</span>' : '';
+          })
+          .catch(function () { /* silent: badge is a convenience, not required */ });
+      }
+      if (badge) {
+        refreshBadge();
+        setInterval(refreshBadge, 30000);
+      }
+    })();
+  </script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

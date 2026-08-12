@@ -1,0 +1,32 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{{ 'Edit' if category else 'Add' }} Category — Admin{% endblock %}
+{% block page_title %}{{ 'Edit' if category else 'Add' }} Category{% endblock %}
+
+{% block admin_content %}
+<div class="card" style="max-width:520px;">
+  {% if error %}<div class="alert alert--error">{{ error }}</div>{% endif %}
+  <form method="post" enctype="multipart/form-data">
+    <div class="form-group">
+      <label for="name">Category Name *</label>
+      <input class="form-control" id="name" name="name" value="{{ category.name if category else '' }}" required>
+    </div>
+    <div class="form-group">
+      <label for="sort_order">Display Order</label>
+      <input class="form-control" id="sort_order" type="number" name="sort_order" value="{{ category.sort_order if category else 0 }}">
+      <p class="field-hint">Lower numbers appear first.</p>
+    </div>
+    <div class="form-group">
+      <label><input type="checkbox" name="active" value="true" {{ 'checked' if not category or category.active }}> Active (visible to customers)</label>
+    </div>
+    <div class="form-group">
+      <label for="image">Category Image (optional)</label>
+      {% if category and category.image %}<div class="thumb-preview" style="margin-bottom:8px;"><img src="{{ category.image }}" alt=""></div>{% endif %}
+      <input class="form-control" id="image" type="file" name="image" accept="image/jpeg,image/png,image/webp">
+    </div>
+    <div class="flex gap-8">
+      <button type="submit" class="btn btn-primary">Save Category</button>
+      <a class="btn btn-secondary" href="/admin/categories">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

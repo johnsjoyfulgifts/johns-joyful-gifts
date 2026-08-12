@@ -1,0 +1,50 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Categories — Admin{% endblock %}
+{% block page_title %}Categories{% endblock %}
+
+{% block admin_content %}
+<div class="flex justify-between items-center" style="margin-bottom:14px;">
+  <span class="text-muted">{{ categories|length }} categories</span>
+  <a class="btn btn-primary btn-sm" href="/admin/categories/new">+ Add Category</a>
+</div>
+
+{% if categories %}
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead><tr><th>Name</th><th>Slug</th><th>Order</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for cat in categories %}
+      <tr>
+        <td>{{ cat.name }}</td>
+        <td class="text-muted">{{ cat.slug }}</td>
+        <td>{{ cat.sort_order }}</td>
+        <td>{% if cat.active %}<span class="badge badge--success">Active</span>{% else %}<span class="badge badge--muted">Inactive</span>{% endif %}</td>
+        <td>
+          <a class="btn btn-sm btn-secondary" href="/admin/categories/{{ cat.id }}/edit">Edit</a>
+          <form method="post" action="/admin/categories/{{ cat.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this category? Products in it will become uncategorized.');">
+            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div class="admin-card-list">
+  {% for cat in categories %}
+  <div class="admin-record-card">
+    <div class="admin-record-card__row"><span>Name</span><span>{{ cat.name }}</span></div>
+    <div class="admin-record-card__row"><span>Status</span><span>{% if cat.active %}<span class="badge badge--success">Active</span>{% else %}<span class="badge badge--muted">Inactive</span>{% endif %}</span></div>
+    <div class="flex gap-8" style="margin-top:10px;">
+      <a class="btn btn-sm btn-secondary" href="/admin/categories/{{ cat.id }}/edit">Edit</a>
+      <form method="post" action="/admin/categories/{{ cat.id }}/delete" onsubmit="return confirm('Delete this category?');">
+        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state"><h3>No categories yet.</h3><p>Add your first category to help customers browse.</p></div>
+{% endif %}
+{% endblock %}

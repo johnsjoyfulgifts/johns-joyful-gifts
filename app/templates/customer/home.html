@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% import "customer/_product_card.html" as cards %}
+
+{% block content %}
+<div class="container">
+  <section class="hero">
+    <h1>{{ store.store_tagline }}</h1>
+    <p>Toys, stationery, school bags &amp; gifts — hand-picked with care, delivered with love.</p>
+    <div class="hero__actions">
+      <a class="btn btn-primary" href="/shop">Shop Now</a>
+      <a class="btn btn-whatsapp" href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener">💬 Chat on WhatsApp</a>
+    </div>
+  </section>
+
+  {% if categories %}
+  <section class="page-section">
+    <h2 class="section-title">Shop by Category</h2>
+    <div class="category-scroll">
+      {% for cat in categories %}
+      <a class="category-chip" href="/category/{{ cat.slug }}">
+        <span class="category-chip__img">
+          {% if cat.image %}<img src="{{ cat.image }}" alt="">{% else %}🎁{% endif %}
+        </span>
+        {{ cat.name }}
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if not has_any_products %}
+  <div class="empty-state">
+    <div class="empty-state__icon">🎁</div>
+    <h3>No products available right now.</h3>
+    <p>We're getting things ready — please check back soon, or message us on WhatsApp!</p>
+  </div>
+  {% endif %}
+
+  {% if featured %}
+  <section class="page-section">
+    <div class="section-title--row">
+      <h2 class="section-title mb-0">Featured Products</h2>
+      <a href="/shop">See all</a>
+    </div>
+    <div class="product-grid">
+      {% for p in featured %}{{ cards.product_card(p) }}{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if new_arrivals %}
+  <section class="page-section">
+    <div class="section-title--row">
+      <h2 class="section-title mb-0">New Arrivals</h2>
+      <a href="/shop?sort=newest">See all</a>
+    </div>
+    <div class="product-grid">
+      {% for p in new_arrivals %}{{ cards.product_card(p) }}{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if bestsellers %}
+  <section class="page-section">
+    <div class="section-title--row">
+      <h2 class="section-title mb-0">Best Sellers</h2>
+      <a href="/shop">See all</a>
+    </div>
+    <div class="product-grid">
+      {% for p in bestsellers %}{{ cards.product_card(p) }}{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="page-section">
+    <div class="trust-grid">
+      <div class="trust-item"><div class="trust-item__icon">🚚</div><div class="trust-item__title">Reliable Delivery</div></div>
+      <div class="trust-item"><div class="trust-item__icon">💵</div><div class="trust-item__title">Cash on Delivery</div></div>
+      <div class="trust-item"><div class="trust-item__icon">💬</div><div class="trust-item__title">Friendly WhatsApp Support</div></div>
+      <div class="trust-item"><div class="trust-item__icon">❤️</div><div class="trust-item__title">Family-Run Business</div></div>
+    </div>
+  </section>
+</div>
+{% endblock %}

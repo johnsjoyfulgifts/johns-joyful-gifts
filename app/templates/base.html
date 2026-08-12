@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}{{ store.store_name }} — {{ store.store_tagline }}{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}{{ store.store_name }}: {{ store.store_tagline }}. Shop toys, stationery, school bags, kids products and gifts online.{% endblock %}">
+  <meta property="og:title" content="{{ store.store_name }}">
+  <meta property="og:description" content="{{ store.store_tagline }}">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#ff6f61">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="icon" href="/static/icons/favicon.svg">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="stylesheet" href="/static/css/style.css">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="site-header__bar">
+      <a class="brand" href="/" aria-label="{{ store.store_name }} home">
+        <span class="brand__logo" aria-hidden="true">JJ</span>
+        <span>{{ store.store_name }}</span>
+      </a>
+      <div class="header-search">
+        <form action="/search" method="get" role="search">
+          <label for="site-search" class="visually-hidden">Search products</label>
+          <input id="site-search" type="search" name="q" placeholder="Search toys, gifts, stationery..." value="{{ request.query_params.get('q', '') }}">
+          <button type="submit" aria-label="Search">🔍</button>
+        </form>
+      </div>
+      <div class="header-actions">
+        <a class="icon-link" href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">💬</a>
+        <a class="icon-link" href="/cart" aria-label="View cart, {{ cart_count|default(0) }} items">
+          🛒
+          {% if cart_count %}<span class="cart-badge">{{ cart_count }}</span>{% endif %}
+        </a>
+      </div>
+    </div>
+    <nav class="site-nav" aria-label="Product categories">
+      <ul class="site-nav__list">
+        <li><a href="/shop">All Products</a></li>
+        {% for cat in nav_categories %}
+        <li><a href="/category/{{ cat.slug }}">{{ cat.name }}</a></li>
+        {% endfor %}
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <a class="whatsapp-float" href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener" aria-label="Chat with us on WhatsApp">💬</a>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <h4>{{ store.store_name }}</h4>
+          <p style="opacity:0.85; font-size:0.85rem;">{{ store.store_tagline }}</p>
+          <ul>
+            <li><a href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener">💬 WhatsApp Us</a></li>
+            <li><a href="{{ store.instagram_url }}" target="_blank" rel="noopener">📷 Instagram</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Shop</h4>
+          <ul>
+            <li><a href="/shop">All Products</a></li>
+            <li><a href="/track-order">Track Order</a></li>
+            <li><a href="/cart">Cart</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Company</h4>
+          <ul>
+            <li><a href="/about">About Us</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Policies</h4>
+          <ul>
+            <li><a href="/privacy-policy">Privacy Policy</a></li>
+            <li><a href="/terms">Terms &amp; Conditions</a></li>
+            <li><a href="/shipping-policy">Shipping Policy</a></li>
+            <li><a href="/refund-policy">Cancellation / Refund Policy</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        &copy; {{ current_year }} {{ store.store_name }}. All rights reserved.
+      </div>
+    </div>
+  </footer>
+
+  <script src="/static/js/cart.js"></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

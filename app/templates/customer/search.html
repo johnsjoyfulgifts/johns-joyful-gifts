@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% import "customer/_product_card.html" as cards %}
+{% block title %}Search{% if query %}: {{ query }}{% endif %} — {{ store.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container page-section">
+  <h1 class="section-title">
+    {% if query %}Search results for "{{ query }}"{% else %}Search{% endif %}
+  </h1>
+
+  {% if not query %}
+  <div class="empty-state">
+    <div class="empty-state__icon">🔍</div>
+    <h3>What are you looking for?</h3>
+    <p>Try searching for toys, stationery, school bags, or gifts.</p>
+  </div>
+  {% elif products %}
+  <p class="text-muted">{{ total }} result{{ 's' if total != 1 }} found</p>
+  <div class="product-grid">
+    {% for p in products %}{{ cards.product_card(p) }}{% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state__icon">🙁</div>
+    <h3>We couldn't find that product.</h3>
+    <p>Try a different search term, or <a href="/shop">browse all products</a>.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

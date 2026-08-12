@@ -1,0 +1,70 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Settings — Admin{% endblock %}
+{% block page_title %}Store Settings{% endblock %}
+
+{% block admin_content %}
+<div class="card" style="max-width:640px;">
+  <form method="post">
+    <h2 style="font-size:1rem; margin-top:0;">Store Info</h2>
+    <div class="form-group">
+      <label for="store_name">Store Name</label>
+      <input class="form-control" id="store_name" name="store_name" value="{{ values.store_name }}" required>
+    </div>
+    <div class="form-group">
+      <label for="store_tagline">Tagline</label>
+      <input class="form-control" id="store_tagline" name="store_tagline" value="{{ values.store_tagline }}">
+    </div>
+
+    <h2 style="font-size:1rem;">Contact &amp; Social</h2>
+    <div class="form-row form-row--2">
+      <div class="form-group">
+        <label for="whatsapp_number">WhatsApp Number (with country code)</label>
+        <input class="form-control" id="whatsapp_number" name="whatsapp_number" value="{{ values.whatsapp_number }}" placeholder="+919999999999" required>
+      </div>
+      <div class="form-group">
+        <label for="instagram_url">Instagram URL</label>
+        <input class="form-control" id="instagram_url" name="instagram_url" value="{{ values.instagram_url }}">
+      </div>
+    </div>
+    <div class="form-row form-row--2">
+      <div class="form-group">
+        <label for="contact_email">Contact Email (optional)</label>
+        <input class="form-control" id="contact_email" type="email" name="contact_email" value="{{ values.contact_email }}">
+      </div>
+      <div class="form-group">
+        <label for="contact_address">Contact Address (optional)</label>
+        <input class="form-control" id="contact_address" name="contact_address" value="{{ values.contact_address }}">
+      </div>
+    </div>
+
+    <h2 style="font-size:1rem;">Delivery Charges</h2>
+    <div class="form-group">
+      <label for="delivery_mode">Delivery Mode</label>
+      <select class="form-control" id="delivery_mode" name="delivery_mode">
+        <option value="flat" {{ 'selected' if values.delivery_mode == 'flat' }}>Flat charge (with optional free threshold)</option>
+        <option value="free" {{ 'selected' if values.delivery_mode == 'free' }}>Always free</option>
+        <option value="disabled" {{ 'selected' if values.delivery_mode == 'disabled' }}>Disabled (no delivery charge line)</option>
+      </select>
+    </div>
+    <div class="form-row form-row--2">
+      <div class="form-group">
+        <label for="flat_delivery_charge">Flat Delivery Charge (₹)</label>
+        <input class="form-control" id="flat_delivery_charge" type="number" step="0.01" min="0" name="flat_delivery_charge" value="{{ values.flat_delivery_charge }}">
+      </div>
+      <div class="form-group">
+        <label for="free_delivery_threshold">Free Delivery Above (₹)</label>
+        <input class="form-control" id="free_delivery_threshold" type="number" step="0.01" min="0" name="free_delivery_threshold" value="{{ values.free_delivery_threshold }}">
+        <p class="field-hint">Set to 0 to disable the free-delivery threshold.</p>
+      </div>
+    </div>
+
+    <h2 style="font-size:1rem;">About Page</h2>
+    <div class="form-group">
+      <label for="about_text">About Us Text</label>
+      <textarea class="form-control" id="about_text" name="about_text" rows="4">{{ values.about_text }}</textarea>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save Settings</button>
+  </form>
+</div>
+{% endblock %}

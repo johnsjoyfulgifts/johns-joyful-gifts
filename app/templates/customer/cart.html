@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Your Cart — {{ store.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container page-section">
+  <h1 class="section-title">Your Cart</h1>
+
+  {% if lines %}
+  <div style="display:grid; gap:24px; grid-template-columns: 1fr;" class="cart-layout">
+    <div class="card">
+      {% for line in lines %}
+      <div class="cart-line">
+        <div class="cart-line__img">
+          {% if line.product.primary_image %}<img src="{{ line.product.primary_image.image_url }}" alt="">{% else %}🎁{% endif %}
+        </div>
+        <div class="cart-line__info">
+          <div class="cart-line__name">{{ line.product.name }}</div>
+          <div class="text-muted" style="font-size:0.85rem;">₹{{ "%.0f"|format(line.product.price) }} each</div>
+          <form class="js-cart-form" action="/api/cart/update" method="post" data-reload-on-success="true" style="margin-top:6px;">
+            <input type="hidden" name="product_id" value="{{ line.product.id }}">
+            <div class="qty-stepper">
+              <button type="button" data-qty-step="-1" aria-label="Decrease quantity">−</button>
+              <input type="number" name="quantity" value="{{ line.quantity }}" min="1" max="{{ line.product.stock }}" aria-label="Quantity" onchange="this.form.requestSubmit()">
+              <button type="button" data-qty-step="1" aria-label="Increase quantity">+</button>
+            </div>
+          </form>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-weight:800;">₹{{ "%.0f"|format(line.subtotal) }}</div>
+          <form class="js-cart-form" action="/api/cart/remove" method="post" data-reload-on-success="true">
+            <input type="hidden" name="product_id" value="{{ line.product.id }}">
+            <button type="submit" class="btn btn-sm btn-secondary" style="margin-top:6px;" aria-label="Remove {{ line.product.name }}">Remove</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="card">
+      <div class="cart-summary-row"><span>Subtotal ({{ item_count }} item{{ 's' if item_count != 1 }})</span><span>₹{{ "%.0f"|format(subtotal) }}</span></div>
+      <div class="cart-summary-row"><span>Delivery</span><span>{{ '₹%.0f'|format(delivery_charge) if delivery_charge else 'FREE' }}</span></div>
+      <div class="cart-summary-row cart-summary-row--total"><span>Total</span><span>₹{{ "%.0f"|format(total) }}</span></div>
+      <a href="/checkout" class="btn btn-primary btn-block" style="margin-top:14px;">Proceed to Checkout</a>
+      <a href="/shop" class="btn btn-secondary btn-block" style="margin-top:8px;">Continue Shopping</a>
+    </div>
+  </div>
+  <style>@media (min-width: 780px) { .cart-layout { grid-template-columns: 2fr 1fr !important; align-items: start; } }</style>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state__icon">🛒</div>
+    <h3>Your cart is waiting for something joyful!</h3>
+    <p>Browse our products and add something you love.</p>
+    <a class="btn btn-primary" href="/shop" style="margin-top:12px;">Shop Now</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

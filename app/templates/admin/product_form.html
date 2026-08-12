@@ -1,0 +1,93 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{{ 'Edit' if product else 'Add' }} Product — Admin{% endblock %}
+{% block page_title %}{{ 'Edit' if product else 'Add' }} Product{% endblock %}
+
+{% block admin_content %}
+<div class="card" style="max-width:720px;">
+  {% if error %}<div class="alert alert--error">{{ error }}</div>{% endif %}
+  <form method="post" enctype="multipart/form-data">
+    <div class="form-group">
+      <label for="name">Product Name *</label>
+      <input class="form-control" id="name" name="name" value="{{ product.name if product else '' }}" required>
+    </div>
+
+    <div class="form-group">
+      <label for="short_description">Short Description</label>
+      <input class="form-control" id="short_description" name="short_description" maxlength="300" value="{{ product.short_description if product else '' }}">
+    </div>
+
+    <div class="form-group">
+      <label for="description">Full Description</label>
+      <textarea class="form-control" id="description" name="description" rows="4">{{ product.description if product else '' }}</textarea>
+    </div>
+
+    <div class="form-row form-row--2">
+      <div class="form-group">
+        <label for="category_id">Category</label>
+        <select class="form-control" id="category_id" name="category_id">
+          <option value="">Uncategorized</option>
+          {% for cat in categories %}
+          <option value="{{ cat.id }}" {{ 'selected' if product and product.category_id == cat.id }}>{{ cat.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="sku">SKU (optional)</label>
+        <input class="form-control" id="sku" name="sku" value="{{ product.sku if product and product.sku else '' }}">
+      </div>
+    </div>
+
+    <div class="form-row form-row--3">
+      <div class="form-group">
+        <label for="price">Price (₹) *</label>
+        <input class="form-control" id="price" type="number" step="0.01" min="0" name="price" value="{{ product.price if product else '' }}" required>
+      </div>
+      <div class="form-group">
+        <label for="original_price">Original Price (₹)</label>
+        <input class="form-control" id="original_price" type="number" step="0.01" min="0" name="original_price" value="{{ product.original_price if product and product.original_price else '' }}">
+        <p class="field-hint">Optional — set higher than price to show a discount.</p>
+      </div>
+      <div class="form-group">
+        <label for="stock">Stock *</label>
+        <input class="form-control" id="stock" type="number" min="0" name="stock" value="{{ product.stock if product else 0 }}" required>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-weight:400;">
+        <span><input type="checkbox" name="active" value="true" {{ 'checked' if not product or product.active }}> Active</span>
+        <span><input type="checkbox" name="featured" value="true" {{ 'checked' if product and product.featured }}> Featured</span>
+        <span><input type="checkbox" name="bestseller" value="true" {{ 'checked' if product and product.bestseller }}> Bestseller</span>
+        <span><input type="checkbox" name="new_arrival" value="true" {{ 'checked' if product and product.new_arrival }}> New Arrival</span>
+      </label>
+    </div>
+
+    {% if product and product.images %}
+    <div class="form-group">
+      <label>Current Images</label>
+      <div class="image-upload-grid">
+        {% for img in product.images %}
+        <div class="image-upload-grid__item">
+          <div class="thumb-preview"><img src="{{ img.image_url }}" alt=""></div>
+          <label style="display:flex;align-items:center;gap:4px;font-size:0.72rem;font-weight:400;justify-content:center;margin-top:4px;">
+            <input type="checkbox" name="delete_image_ids" value="{{ img.id }}"> Remove
+          </label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="form-group">
+      <label for="images">{{ 'Add More Images' if product and product.images else 'Product Images' }}</label>
+      <input class="form-control" id="images" type="file" name="images" accept="image/jpeg,image/png,image/webp" multiple>
+      <p class="field-hint">JPG, PNG or WEBP. Large photos are automatically resized.</p>
+    </div>
+
+    <div class="flex gap-8">
+      <button type="submit" class="btn btn-primary">Save Product</button>
+      <a class="btn btn-secondary" href="/admin/products">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

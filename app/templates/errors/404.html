@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Page Not Found — {{ store.store_name }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="error-page">
+    <div class="error-page__code">404</div>
+    <h1>We couldn't find that page</h1>
+    <p class="text-muted">The page you're looking for may have moved or no longer exists.</p>
+    <div class="hero__actions" style="margin-top:20px;">
+      <a class="btn btn-primary" href="/">Go to Homepage</a>
+      <a class="btn btn-secondary" href="/shop">Browse Products</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

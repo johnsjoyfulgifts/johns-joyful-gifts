@@ -1,0 +1,76 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Dashboard — Admin{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block admin_content %}
+<div class="stat-grid">
+  <div class="stat-card"><div class="stat-card__value">{{ total_orders }}</div><div class="stat-card__label">Total Orders</div></div>
+  <div class="stat-card"><div class="stat-card__value">{{ new_order_count }}</div><div class="stat-card__label">New (Unviewed)</div></div>
+  <div class="stat-card"><div class="stat-card__value">{{ processing_count }}</div><div class="stat-card__label">Processing</div></div>
+  <div class="stat-card"><div class="stat-card__value">{{ shipped_count }}</div><div class="stat-card__label">Shipped</div></div>
+  <div class="stat-card"><div class="stat-card__value">{{ delivered_count }}</div><div class="stat-card__label">Delivered</div></div>
+  <div class="stat-card"><div class="stat-card__value">{{ cancelled_count }}</div><div class="stat-card__label">Cancelled</div></div>
+</div>
+
+<div class="card" style="margin-top:16px;">
+  <div class="stat-card__label">Total Sales (excl. cancelled)</div>
+  <div class="stat-card__value" style="font-size:1.8rem;">₹{{ "%.0f"|format(total_sales) }}</div>
+</div>
+
+{% if out_of_stock_count > 0 or low_stock %}
+<div class="card" style="margin-top:16px;">
+  <h2 style="font-size:1rem; margin-top:0;">Stock Alerts</h2>
+  {% if out_of_stock_count > 0 %}<p class="badge badge--danger">{{ out_of_stock_count }} product(s) out of stock</p>{% endif %}
+  {% if low_stock %}
+  <div class="admin-table-wrap" style="margin-top:10px;">
+    <table class="admin-table">
+      <thead><tr><th>Product</th><th>Stock Left</th></tr></thead>
+      <tbody>
+        {% for p in low_stock %}
+        <tr><td><a href="/admin/products/{{ p.id }}/edit">{{ p.name }}</a></td><td>{{ p.stock }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card" style="margin-top:16px;">
+  <div class="flex justify-between items-center">
+    <h2 style="font-size:1rem; margin:0;">Recent Orders</h2>
+    <a href="/admin/orders" style="font-size:0.85rem;">View all</a>
+  </div>
+
+  {% if recent_orders %}
+  <div class="admin-table-wrap" style="margin-top:10px;">
+    <table class="admin-table">
+      <thead><tr><th>Order #</th><th>Customer</th><th>Total</th><th>Status</th><th>Placed</th></tr></thead>
+      <tbody>
+        {% for o in recent_orders %}
+        <tr>
+          <td><a href="/admin/orders/{{ o.order_number }}">{{ o.order_number }}</a> {% if not o.viewed_by_admin %}<span class="notif-badge">NEW</span>{% endif %}</td>
+          <td>{{ o.customer.name }}</td>
+          <td>₹{{ "%.0f"|format(o.total) }}</td>
+          <td><span class="badge badge--info">{{ o.order_status }}</span></td>
+          <td>{{ o.created_at.strftime('%d %b, %I:%M %p') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="admin-card-list">
+    {% for o in recent_orders %}
+    <div class="admin-record-card">
+      <div class="admin-record-card__row"><span>Order</span><a href="/admin/orders/{{ o.order_number }}">{{ o.order_number }}</a></div>
+      <div class="admin-record-card__row"><span>Customer</span><span>{{ o.customer.name }}</span></div>
+      <div class="admin-record-card__row"><span>Total</span><span>₹{{ "%.0f"|format(o.total) }}</span></div>
+      <div class="admin-record-card__row"><span>Status</span><span class="badge badge--info">{{ o.order_status }}</span></div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state"><h3>No orders found.</h3></div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+# Copy to fly.toml and adjust `app` name after running `fly launch`.
+# See README.md "Free Deployment (Fly.io)" for full setup steps.
+
+app = "johns-joyful-gifts"
+primary_region = "bom"  # pick the region closest to your customers
+
+[build]
+
+[env]
+  ENVIRONMENT = "production"
+  DATABASE_URL = "sqlite:////data/johns_joyful_gifts.db"
+  UPLOAD_DIR = "/data/uploads"
+  # SECRET_KEY should be set as a secret, not here:
+  #   fly secrets set SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+
+[mounts]
+  source = "data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256

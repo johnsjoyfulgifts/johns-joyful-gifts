@@ -1,0 +1,38 @@
+{% macro product_card(product) %}
+<div class="product-card">
+  <a href="/product/{{ product.slug }}" class="product-card__img" aria-label="{{ product.name }}">
+    {% if product.primary_image %}
+      <img src="{{ product.primary_image.image_url }}" alt="{{ product.name }}" loading="lazy">
+    {% else %}
+      <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;">🎁</div>
+    {% endif %}
+    {% if product.discount_percent %}<span class="product-card__badge">{{ product.discount_percent }}% OFF</span>
+    {% elif product.new_arrival %}<span class="product-card__badge">NEW</span>{% endif %}
+  </a>
+  <div class="product-card__body">
+    <a href="/product/{{ product.slug }}"><div class="product-card__name">{{ product.name }}</div></a>
+    <div class="product-card__price">
+      <span class="price">₹{{ "%.0f"|format(product.price) }}</span>
+      {% if product.original_price and product.original_price > product.price %}
+        <span class="price--old">₹{{ "%.0f"|format(product.original_price) }}</span>
+      {% endif %}
+    </div>
+    {% if product.in_stock %}
+      <span class="stock-note">In stock</span>
+    {% else %}
+      <span class="stock-note stock-note--out">Out of stock</span>
+    {% endif %}
+    <div class="product-card__cta">
+      {% if product.in_stock %}
+      <form class="js-cart-form" action="/api/cart/add" method="post" data-success-message="Added to cart!">
+        <input type="hidden" name="product_id" value="{{ product.id }}">
+        <input type="hidden" name="quantity" value="1">
+        <button type="submit" class="btn btn-primary btn-sm btn-block">Add to Cart</button>
+      </form>
+      {% else %}
+      <button class="btn btn-secondary btn-sm btn-block" disabled>Out of Stock</button>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endmacro %}

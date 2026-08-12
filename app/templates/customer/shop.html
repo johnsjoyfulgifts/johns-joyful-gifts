@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% import "customer/_product_card.html" as cards %}
+{% block title %}{{ page_title }} — {{ store.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container page-section">
+  <h1 class="section-title">{{ page_title }}</h1>
+
+  <form class="filter-bar" method="get">
+    {% if filters.category %}<input type="hidden" name="category" value="{{ filters.category }}">{% endif %}
+    <select name="sort" onchange="this.form.submit()">
+      <option value="" {{ 'selected' if not filters.sort }}>Sort: Featured</option>
+      <option value="newest" {{ 'selected' if filters.sort == 'newest' }}>Newest</option>
+      <option value="price_asc" {{ 'selected' if filters.sort == 'price_asc' }}>Price: Low to High</option>
+      <option value="price_desc" {{ 'selected' if filters.sort == 'price_desc' }}>Price: High to Low</option>
+    </select>
+    <label style="font-size:0.85rem; display:flex; align-items:center; gap:4px;">
+      <input type="checkbox" name="in_stock" value="true" {{ 'checked' if filters.in_stock }} onchange="this.form.submit()">
+      In stock only
+    </label>
+    <span class="text-muted" style="font-size:0.82rem;">{{ total }} product{{ 's' if total != 1 }}</span>
+  </form>
+
+  {% if products %}
+  <div class="product-grid">
+    {% for p in products %}{{ cards.product_card(p) }}{% endfor %}
+  </div>
+
+  {% if total_pages > 1 %}
+  <div class="flex gap-8 justify-between" style="margin-top:24px;">
+    {% if page > 1 %}
+      <a class="btn btn-secondary btn-sm" href="?{{ request.url.include_query_params(page=page-1).query }}">← Previous</a>
+    {% else %}
+      <span></span>
+    {% endif %}
+    <span class="text-muted" style="align-self:center;">Page {{ page }} of {{ total_pages }}</span>
+    {% if page < total_pages %}
+      <a class="btn btn-secondary btn-sm" href="?{{ request.url.include_query_params(page=page+1).query }}">Next →</a>
+    {% else %}
+      <span></span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state__icon">🔍</div>
+    <h3>No products available right now.</h3>
+    <p>Try a different filter or check back soon.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

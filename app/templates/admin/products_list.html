@@ -1,0 +1,83 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Products — Admin{% endblock %}
+{% block page_title %}Products{% endblock %}
+
+{% block admin_content %}
+<div class="flex justify-between items-center" style="margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+  <span class="text-muted">{{ total }} products</span>
+  <a class="btn btn-primary btn-sm" href="/admin/products/new">+ Add Product</a>
+</div>
+
+<form class="filter-bar" method="get">
+  <input type="text" name="q" placeholder="Search products..." value="{{ q }}">
+  <select name="category">
+    <option value="">All Categories</option>
+    {% for cat in categories %}<option value="{{ cat.id }}" {{ 'selected' if selected_category == cat.id }}>{{ cat.name }}</option>{% endfor %}
+  </select>
+  <select name="status">
+    <option value="" {{ 'selected' if not status }}>All Status</option>
+    <option value="active" {{ 'selected' if status == 'active' }}>Active</option>
+    <option value="inactive" {{ 'selected' if status == 'inactive' }}>Inactive</option>
+    <option value="out_of_stock" {{ 'selected' if status == 'out_of_stock' }}>Out of Stock</option>
+  </select>
+  <button type="submit" class="btn btn-sm btn-secondary">Filter</button>
+</form>
+
+{% if products %}
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for p in products %}
+      <tr>
+        <td><div class="thumb-preview" style="width:44px;height:44px;">{% if p.primary_image %}<img src="{{ p.primary_image.image_url }}" alt="">{% endif %}</div></td>
+        <td>{{ p.name }}</td>
+        <td class="text-muted">{{ p.category.name if p.category else '—' }}</td>
+        <td>₹{{ "%.0f"|format(p.price) }}</td>
+        <td>{% if p.stock <= 0 %}<span class="badge badge--danger">0</span>{% elif p.stock <= 5 %}<span class="badge badge--warning">{{ p.stock }}</span>{% else %}{{ p.stock }}{% endif %}</td>
+        <td>{% if p.active %}<span class="badge badge--success">Active</span>{% else %}<span class="badge badge--muted">Inactive</span>{% endif %}</td>
+        <td>
+          <a class="btn btn-sm btn-secondary" href="/admin/products/{{ p.id }}/edit">Edit</a>
+          <form method="post" action="/admin/products/{{ p.id }}/duplicate" style="display:inline;"><button type="submit" class="btn btn-sm btn-secondary">Duplicate</button></form>
+          <form method="post" action="/admin/products/{{ p.id }}/toggle-active" style="display:inline;"><button type="submit" class="btn btn-sm btn-secondary">{{ 'Deactivate' if p.active else 'Activate' }}</button></form>
+          <form method="post" action="/admin/products/{{ p.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this product permanently?');"><button type="submit" class="btn btn-sm btn-danger">Delete</button></form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="admin-card-list">
+  {% for p in products %}
+  <div class="admin-record-card">
+    <div class="flex gap-12 items-center">
+      <div class="thumb-preview" style="width:56px;height:56px;flex-shrink:0;">{% if p.primary_image %}<img src="{{ p.primary_image.image_url }}" alt="">{% endif %}</div>
+      <div style="flex:1;">
+        <strong>{{ p.name }}</strong>
+        <div class="text-muted" style="font-size:0.8rem;">₹{{ "%.0f"|format(p.price) }} · Stock: {{ p.stock }}</div>
+      </div>
+      {% if p.active %}<span class="badge badge--success">Active</span>{% else %}<span class="badge badge--muted">Inactive</span>{% endif %}
+    </div>
+    <div class="flex gap-8" style="margin-top:10px; flex-wrap:wrap;">
+      <a class="btn btn-sm btn-secondary" href="/admin/products/{{ p.id }}/edit">Edit</a>
+      <form method="post" action="/admin/products/{{ p.id }}/duplicate"><button type="submit" class="btn btn-sm btn-secondary">Duplicate</button></form>
+      <form method="post" action="/admin/products/{{ p.id }}/toggle-active"><button type="submit" class="btn btn-sm btn-secondary">{{ 'Deactivate' if p.active else 'Activate' }}</button></form>
+      <form method="post" action="/admin/products/{{ p.id }}/delete" onsubmit="return confirm('Delete this product permanently?');"><button type="submit" class="btn btn-sm btn-danger">Delete</button></form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if total_pages > 1 %}
+<div class="flex gap-8 justify-between" style="margin-top:16px;">
+  {% if page > 1 %}<a class="btn btn-sm btn-secondary" href="?{{ request.url.include_query_params(page=page-1).query }}">← Previous</a>{% else %}<span></span>{% endif %}
+  <span class="text-muted">Page {{ page }} of {{ total_pages }}</span>
+  {% if page < total_pages %}<a class="btn btn-sm btn-secondary" href="?{{ request.url.include_query_params(page=page+1).query }}">Next →</a>{% else %}<span></span>{% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state"><h3>No products found.</h3><p>Try a different filter, or add your first product.</p></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Checkout — {{ store.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container page-section">
+  <h1 class="section-title">Checkout</h1>
+
+  {% if not lines %}
+  <div class="empty-state">
+    <div class="empty-state__icon">🛒</div>
+    <h3>Your cart is waiting for something joyful!</h3>
+    <p>Add a few products before checking out.</p>
+    <a class="btn btn-primary" href="/shop" style="margin-top:12px;">Shop Now</a>
+  </div>
+  {% else %}
+  <div style="display:grid; gap:24px;" class="checkout-layout">
+    <div class="card">
+      <div id="checkout-alert"></div>
+      <form id="checkout-form" novalidate>
+        <h2 style="font-size:1rem; margin-top:0;">Delivery Details</h2>
+        <div class="form-group">
+          <label for="full_name">Full Name *</label>
+          <input class="form-control" id="full_name" name="full_name" required autocomplete="name">
+        </div>
+        <div class="form-row form-row--2">
+          <div class="form-group">
+            <label for="mobile">Mobile Number *</label>
+            <input class="form-control" id="mobile" name="mobile" required inputmode="tel" autocomplete="tel">
+          </div>
+          <div class="form-group">
+            <label for="email">Email (optional)</label>
+            <input class="form-control" id="email" name="email" type="email" autocomplete="email">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="address">Address *</label>
+          <textarea class="form-control" id="address" name="address" rows="2" required autocomplete="street-address"></textarea>
+        </div>
+        <div class="form-row form-row--3">
+          <div class="form-group">
+            <label for="city">City *</label>
+            <input class="form-control" id="city" name="city" required autocomplete="address-level2">
+          </div>
+          <div class="form-group">
+            <label for="state">State *</label>
+            <input class="form-control" id="state" name="state" required autocomplete="address-level1">
+          </div>
+          <div class="form-group">
+            <label for="pincode">Pincode *</label>
+            <input class="form-control" id="pincode" name="pincode" required inputmode="numeric" autocomplete="postal-code">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="delivery_instructions">Delivery Instructions (optional)</label>
+          <textarea class="form-control" id="delivery_instructions" name="delivery_instructions" rows="2"></textarea>
+        </div>
+
+        <h2 style="font-size:1rem;">Payment Method</h2>
+        <p class="badge badge--info">Cash on Delivery</p>
+
+        <button type="submit" class="btn btn-primary btn-block" id="place-order-btn" style="margin-top:16px;">
+          Place Order — ₹{{ "%.0f"|format(total) }}
+        </button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:1rem; margin-top:0;">Order Summary</h2>
+      {% for line in lines %}
+      <div class="cart-summary-row"><span>{{ line.product.name }} × {{ line.quantity }}</span><span>₹{{ "%.0f"|format(line.subtotal) }}</span></div>
+      {% endfor %}
+      <div class="cart-summary-row"><span>Subtotal</span><span>₹{{ "%.0f"|format(subtotal) }}</span></div>
+      <div class="cart-summary-row"><span>Delivery</span><span>{{ '₹%.0f'|format(delivery_charge) if delivery_charge else 'FREE' }}</span></div>
+      <div class="cart-summary-row cart-summary-row--total"><span>Total</span><span>₹{{ "%.0f"|format(total) }}</span></div>
+    </div>
+  </div>
+  <style>@media (min-width: 780px) { .checkout-layout { grid-template-columns: 2fr 1fr; align-items: start; } }</style>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var form = document.getElementById('checkout-form');
+  if (!form) return;
+  var btn = document.getElementById('place-order-btn');
+  var alertBox = document.getElementById('checkout-alert');
+
+  // One idempotency key per checkout attempt on this cart. It's only
+  // regenerated after a successful order, so double-clicks, refreshes, or
+  // slow-network retries during the SAME attempt reuse the same key and the
+  // server returns the original order instead of creating a duplicate.
+  function getIdempotencyKey() {
+    var key = sessionStorage.getItem('jjg_checkout_key');
+    if (!key) {
+      key = 'ck_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2);
+      sessionStorage.setItem('jjg_checkout_key', key);
+    }
+    return key;
+  }
+
+  function showError(message) {
+    alertBox.innerHTML = '<div class="alert alert--error" role="alert">' + message + '</div>';
+  }
+
+  form.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    if (btn.disabled) return; // duplicate-submission lock
+    btn.disabled = true;
+    btn.textContent = 'Placing your order...';
+    alertBox.innerHTML = '';
+
+    var data = Object.fromEntries(new FormData(form).entries());
+    data.idempotency_key = getIdempotencyKey();
+
+    try {
+      var res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(data),
+      });
+      var body = await res.json();
+      if (!res.ok) {
+        showError(body.detail || 'Something went wrong. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Place Order';
+        return;
+      }
+      sessionStorage.removeItem('jjg_checkout_key');
+      window.location.href = '/order/' + encodeURIComponent(body.order_number) + '/success';
+    } catch (err) {
+      showError('Your internet connection seems to be unavailable. Please check your connection and try again.');
+      btn.disabled = false;
+      btn.textContent = 'Place Order';
+    }
+  });
+})();
+</script>
+{% endblock %}
