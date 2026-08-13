@@ -10,8 +10,10 @@ primary_region = "bom"  # pick the region closest to your customers
   ENVIRONMENT = "production"
   DATABASE_URL = "sqlite:////data/johns_joyful_gifts.db"
   UPLOAD_DIR = "/data/uploads"
-  # SECRET_KEY should be set as a secret, not here:
+  # SECRET_KEY and Razorpay keys should be set as secrets, not here:
   #   fly secrets set SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+  #   fly secrets set RAZORPAY_KEY_ID=rzp_live_xxxx RAZORPAY_KEY_SECRET=xxxx
+  # (omit the Razorpay secrets entirely to keep running Cash-on-Delivery only)
 
 [mounts]
   source = "data"

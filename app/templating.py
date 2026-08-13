@@ -1,5 +1,7 @@
+import json
 import os
 from datetime import datetime, timezone
+from markupsafe import Markup
 
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -9,6 +11,14 @@ from app.settings_service import get_all_settings
 
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+
+def _tojson_filter(value) -> Markup:
+    """Safe to embed inside a <script> block, e.g. var x = {{ value|tojson }};"""
+    return Markup(json.dumps(value).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))
+
+
+templates.env.filters["tojson"] = _tojson_filter
 
 
 def _common_context(request, db: Session) -> dict:

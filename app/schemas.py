@@ -16,6 +16,7 @@ class CheckoutRequest(BaseModel):
     email: str | None = None
     delivery_instructions: str | None = None
     idempotency_key: str
+    payment_method: str = "cod"
 
     @field_validator("full_name", "address", "city", "state")
     @classmethod
@@ -48,6 +49,20 @@ class CheckoutRequest(BaseModel):
         if not (8 <= len(value) <= 80):
             raise ValueError("Invalid request.")
         return value
+
+    @field_validator("payment_method")
+    @classmethod
+    def valid_payment_method(cls, value: str) -> str:
+        if value not in ("cod", "online"):
+            raise ValueError("Invalid payment method.")
+        return value
+
+
+class VerifyPaymentRequest(BaseModel):
+    order_number: str
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
 
 
 class TrackOrderRequest(BaseModel):

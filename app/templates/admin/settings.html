@@ -58,6 +58,30 @@
       </div>
     </div>
 
+    <h2 style="font-size:1rem;">Online Payment (Razorpay)</h2>
+    {% if razorpay_configured %}
+    <div class="form-group">
+      <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+        <input type="checkbox" name="payment_online_enabled" value="true" {{ 'checked' if values.payment_online_enabled == 'true' }}>
+        Offer "Pay Online" at checkout, alongside Cash on Delivery
+      </label>
+      <p class="field-hint">Razorpay keys are configured on the server. Cash on Delivery is always available regardless of this setting.</p>
+    </div>
+    {% else %}
+    <div class="alert alert--info">
+      Razorpay isn't set up yet, so "Pay Online" won't appear at checkout even if you enable it here. Add
+      <code>RAZORPAY_KEY_ID</code> and <code>RAZORPAY_KEY_SECRET</code> to the server's <code>.env</code> file
+      (get free test-mode keys at <a href="https://dashboard.razorpay.com/app/keys" target="_blank" rel="noopener">dashboard.razorpay.com/app/keys</a>
+      after signing up) and restart the app. See README.md for full setup steps.
+    </div>
+    <div class="form-group">
+      <label style="display:flex; align-items:center; gap:8px; font-weight:400; opacity:0.6;">
+        <input type="checkbox" name="payment_online_enabled" value="true" {{ 'checked' if values.payment_online_enabled == 'true' }} disabled>
+        Offer "Pay Online" at checkout (needs Razorpay keys first)
+      </label>
+    </div>
+    {% endif %}
+
     <h2 style="font-size:1rem;">About Page</h2>
     <div class="form-group">
       <label for="about_text">About Us Text</label>

@@ -2,18 +2,22 @@
 
 A simple, mobile-first e-commerce web app for a small home business selling toys,
 stationery, school bags, kids products and gifts. Customers browse, cart, and
-checkout as a guest (Cash on Delivery); the owner manages products, stock and
-orders from a mobile-friendly admin panel. Built to run at **zero mandatory
-recurring cost**.
+checkout as a guest (Cash on Delivery, or online via Razorpay if configured);
+the owner manages products, stock and orders from a mobile-friendly admin
+panel. Built to run at **zero mandatory recurring cost** — online payment is
+opt-in and the only piece that isn't free (gateway transaction fees apply).
 
 ## Overview
 
 - Customers get one link, browse/search products, checkout as a guest, get an
   order number, and can track their order later with the order number + mobile
   number.
-- The owner logs into `/admin` (from a phone or desktop) to add products, upload
-  photos, manage stock, and update order status/courier tracking.
-- No accounts, no payment gateway, no paid infrastructure required to run.
+- The owner logs into `/admin` (linked at the bottom of every page, or go
+  directly to `/admin/login`) to add products, upload photos, manage stock,
+  and update order status/courier tracking.
+- No accounts and no paid infrastructure required to run. Online payment via
+  Razorpay is available but entirely optional — see "Online Payment
+  (Razorpay)" below; Cash on Delivery always works with zero setup.
 
 ## Architecture
 
@@ -87,6 +91,54 @@ at checkout, and returns the identical "not found" message whether the order
 number is wrong or just the mobile doesn't match — so it can't be used to
 enumerate valid order numbers.
 
+### Online Payment (Razorpay)
+
+Optional, off by default. Cash on Delivery always works with zero setup;
+"Pay Online" only appears at checkout once **both** of these are true:
+
+1. `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` are set in `.env`.
+2. The admin has turned it on at `/admin/settings` → "Online Payment (Razorpay)".
+
+**Getting test-mode keys (free, no real bank account needed):**
+
+1. Sign up at [razorpay.com](https://razorpay.com).
+2. In the dashboard, make sure **Test Mode** is on (top-right toggle).
+3. Go to Settings → API Keys → Generate Test Key, copy the Key ID and Key Secret.
+4. Put them in `.env`:
+   ```
+   RAZORPAY_KEY_ID=rzp_test_xxxxxxxxxxxx
+   RAZORPAY_KEY_SECRET=xxxxxxxxxxxxxxxxxxxxxxxx
+   ```
+5. Restart the app, then enable the toggle in `/admin/settings`.
+6. Test with Razorpay's published test card `4111 1111 1111 1111`, any future
+   expiry, any CVV — this simulates a real payment without moving real money.
+   Test-mode UPI/other methods are documented on Razorpay's test-mode page.
+
+When you're ready to accept real payments, generate **live** keys from the
+same dashboard (requires KYC/business verification with Razorpay) and swap
+them into `.env` — nothing else in the app changes.
+
+**How a payment is trusted**: the browser never gets to declare "payment
+succeeded" — `app/payments.py`'s `verify_payment_signature()` recomputes the
+HMAC-SHA256 signature server-side using your secret key and only marks an
+order Paid if it matches exactly (`app/routers/checkout.py`'s
+`/api/checkout/verify-payment`). A forged or tampered confirmation is
+rejected; see `tests/test_payment.py`.
+
+**What happens if a customer abandons payment**: the order is already created
+(with stock reserved) as soon as they click Place Order — Razorpay's widget
+opens after that. If they close it or the payment fails, the order stays
+`Pending`/`Order Placed`, visible in `/admin/orders` for you to follow up
+(WhatsApp them) or cancel — cancelling automatically releases the reserved
+stock back into inventory.
+
+**Not covered by the automated test suite**: `create_razorpay_order()` (the
+step that calls Razorpay's API to start a payment) needs real network access
+and real credentials, so it isn't exercised by `pytest` — only the signature
+verification logic is (which is the security-critical half). Test the full
+"click Pay Online → Razorpay widget opens → test card → redirected to order
+success" flow manually once you've added test-mode keys.
+
 ## Local Setup
 
 Requires Python 3.10+ (no Node.js needed).
@@ -111,6 +163,7 @@ Copy `.env.example` to `.env` and fill in real values:
 | `MAX_UPLOAD_SIZE_BYTES` | Per-image upload limit (default 5 MB). |
 | `STORE_NAME`, `STORE_TAGLINE`, `WHATSAPP_NUMBER`, `INSTAGRAM_URL`, `DEFAULT_DELIVERY_CHARGE`, `FREE_DELIVERY_THRESHOLD` | Initial defaults — all editable later from `/admin/settings` without redeploying. |
 | `ENVIRONMENT` | Set to `production` to enable secure (HTTPS-only) cookies. |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Optional. Leave blank to run Cash-on-Delivery only. See "Online Payment (Razorpay)" above. |
 
 ## Database Setup
 
@@ -162,8 +215,10 @@ pytest -v
 The suite specifically exercises the safety-critical paths: concurrent
 checkout oversell prevention, duplicate-order idempotency (both sequential
 retries and true concurrent double-submits), order-tracking authorization,
-and that pricing/stock are always server-computed. All 13 tests pass, and the
-concurrency tests were run repeatedly to confirm they aren't flaky.
+that pricing/stock are always server-computed, Razorpay payment-signature
+verification (valid/tampered/mismatched), and stock restoration on order
+cancellation. All 23 tests pass, and the concurrency tests were run
+repeatedly to confirm they aren't flaky.
 
 Beyond the automated suite, the full customer journey (browse → cart →
 checkout → order success → track) and full admin journey (login → add
@@ -249,8 +304,8 @@ added later without a rewrite:
 - Swap SQLite for hosted Postgres (e.g. Neon/Supabase free tier) if order
   volume grows enough that SQLite's single-writer model becomes limiting.
 - Swap local image storage for S3/Cloudinary via `app/storage.py`.
-- Add UPI/online payment (the data model already has `payment_method` and
-  `payment_status` fields ready for it) — deliberately not implemented in v1
-  per the project's zero-cost, keep-it-simple requirements.
+- Online payment via Razorpay is implemented (see above) but optional —
+  consider adding a scheduled job to auto-cancel (and restock) long-abandoned
+  `Pending` online orders instead of relying on manual admin cleanup.
 - WhatsApp Business API for automated order confirmations, if the business
   outgrows the manual `wa.me` deep-link flow.

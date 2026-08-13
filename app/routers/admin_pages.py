@@ -11,6 +11,7 @@ from app.auth import (
     set_session_cookie,
     verify_password,
 )
+from app.config import get_settings
 from app.database import get_db
 from app.rate_limit import is_rate_limited
 from app.models import (
@@ -476,7 +477,17 @@ def product_toggle_active(product_id: int, db: Session = Depends(get_db), admin:
 @router.get("/settings")
 def settings_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
     values = get_all_settings(db)
-    return render_admin(request, "admin/settings.html", {"active_nav": "settings", "values": values}, db)
+    razorpay_settings = get_settings()
+    return render_admin(
+        request,
+        "admin/settings.html",
+        {
+            "active_nav": "settings",
+            "values": values,
+            "razorpay_configured": razorpay_settings.razorpay_configured,
+        },
+        db,
+    )
 
 
 @router.post("/settings")
@@ -492,6 +503,7 @@ def settings_submit(
     about_text: str = Form(""),
     contact_email: str = Form(""),
     contact_address: str = Form(""),
+    payment_online_enabled: bool = Form(False),
     db: Session = Depends(get_db),
     admin: Admin = Depends(require_admin),
 ):
@@ -508,6 +520,7 @@ def settings_submit(
             "about_text": about_text,
             "contact_email": contact_email.strip(),
             "contact_address": contact_address.strip(),
+            "payment_online_enabled": "true" if payment_online_enabled else "false",
         },
     )
     return RedirectResponse(url="/admin/settings", status_code=303)
@@ -581,10 +594,23 @@ def order_update_status(
     db: Session = Depends(get_db),
     admin: Admin = Depends(require_admin),
 ):
-    order = db.query(Order).filter(Order.order_number == order_number).first()
+    order = db.query(Order).options(joinedload(Order.items)).filter(Order.order_number == order_number).first()
     if order is not None and status in ORDER_STATUSES and status != order.order_status:
         order.order_status = status
         db.add(OrderStatusHistory(order_id=order.id, status=status))
+
+        # Cancelling releases any stock this order was holding — matters
+        # most for abandoned online payments, but applies equally to COD.
+        # Guarded by stock_restored so re-saving/re-cancelling never double-
+        # restores the same units.
+        if status == OrderStatus.CANCELLED.value and not order.stock_restored:
+            for item in order.items:
+                if item.product_id is not None:
+                    product = db.get(Product, item.product_id)
+                    if product is not None:
+                        product.stock += item.quantity
+            order.stock_restored = True
+
         db.commit()
     return RedirectResponse(url=f"/admin/orders/{order_number}", status_code=303)
 

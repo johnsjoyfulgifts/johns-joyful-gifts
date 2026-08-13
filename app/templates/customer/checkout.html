@@ -56,7 +56,19 @@
         </div>
 
         <h2 style="font-size:1rem;">Payment Method</h2>
+        {% if online_payment_available %}
+        <div class="form-group" style="display:flex; flex-direction:column; gap:8px;">
+          <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+            <input type="radio" name="payment_method" value="cod" checked> Cash on Delivery
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+            <input type="radio" name="payment_method" value="online"> Pay Online (Card / UPI / Netbanking)
+          </label>
+        </div>
+        {% else %}
+        <input type="hidden" name="payment_method" value="cod">
         <p class="badge badge--info">Cash on Delivery</p>
+        {% endif %}
 
         <button type="submit" class="btn btn-primary btn-block" id="place-order-btn" style="margin-top:16px;">
           Place Order — ₹{{ "%.0f"|format(total) }}
@@ -80,12 +92,16 @@
 {% endblock %}
 
 {% block extra_scripts %}
+{% if online_payment_available %}
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+{% endif %}
 <script>
 (function () {
   var form = document.getElementById('checkout-form');
   if (!form) return;
   var btn = document.getElementById('place-order-btn');
   var alertBox = document.getElementById('checkout-alert');
+  var storeName = {{ store.store_name|tojson }};
 
   // One idempotency key per checkout attempt on this cart. It's only
   // regenerated after a successful order, so double-clicks, refreshes, or
@@ -102,6 +118,66 @@
 
   function showError(message) {
     alertBox.innerHTML = '<div class="alert alert--error" role="alert">' + message + '</div>';
+  }
+
+  function resetButton() {
+    btn.disabled = false;
+    btn.textContent = 'Place Order';
+  }
+
+  function goToSuccess(orderNumber) {
+    sessionStorage.removeItem('jjg_checkout_key');
+    window.location.href = '/order/' + encodeURIComponent(orderNumber) + '/success';
+  }
+
+  function openRazorpay(body) {
+    if (typeof Razorpay === 'undefined') {
+      // Script failed to load (e.g. offline) — the order already exists as
+      // Pending, so don't strand the customer, just take them to it.
+      goToSuccess(body.order_number);
+      return;
+    }
+    var rzp = new Razorpay({
+      key: body.razorpay_key_id,
+      amount: body.amount_paise,
+      currency: 'INR',
+      name: storeName,
+      description: 'Order ' + body.order_number,
+      order_id: body.razorpay_order_id,
+      handler: async function (response) {
+        try {
+          var verifyRes = await fetch('/api/checkout/verify-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({
+              order_number: body.order_number,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+          // Whether verification succeeds or fails, the order already
+          // exists — send them to it either way so they always have a
+          // reference number. A failed verification leaves it Pending.
+          if (!verifyRes.ok) {
+            var errBody = await verifyRes.json();
+            showError(errBody.detail || 'Payment verification failed.');
+          }
+        } catch (err) {
+          showError('Could not confirm payment status. Please check your order status on the Track Order page.');
+        }
+        goToSuccess(body.order_number);
+      },
+      modal: {
+        ondismiss: function () {
+          // Order already exists (Pending) — let them retry or use the
+          // order-success/tracking page instead of losing it.
+          showError('Payment was cancelled. Your order ' + body.order_number + ' is saved — you can pay later or contact us on WhatsApp.');
+          goToSuccess(body.order_number);
+        },
+      },
+    });
+    rzp.open();
   }
 
   form.addEventListener('submit', async function (event) {
@@ -123,16 +199,19 @@
       var body = await res.json();
       if (!res.ok) {
         showError(body.detail || 'Something went wrong. Please try again.');
-        btn.disabled = false;
-        btn.textContent = 'Place Order';
+        resetButton();
         return;
       }
-      sessionStorage.removeItem('jjg_checkout_key');
-      window.location.href = '/order/' + encodeURIComponent(body.order_number) + '/success';
+
+      if (body.payment_method === 'Online Payment' && !body.payment_error && body.razorpay_order_id) {
+        openRazorpay(body);
+        return;
+      }
+
+      goToSuccess(body.order_number);
     } catch (err) {
       showError('Your internet connection seems to be unavailable. Please check your connection and try again.');
-      btn.disabled = false;
-      btn.textContent = 'Place Order';
+      resetButton();
     }
   });
 })();

@@ -151,6 +151,9 @@ class Order(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     viewed_by_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    razorpay_order_id: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
+    razorpay_payment_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    stock_restored: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 

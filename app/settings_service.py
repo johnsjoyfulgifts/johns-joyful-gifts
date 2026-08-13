@@ -23,7 +23,18 @@ DEFAULTS: dict[str, str] = {
     "about_text": "We're a small family-run gift shop. Details coming soon.",
     "contact_email": "",
     "contact_address": "",
+    "payment_online_enabled": "false",
 }
+
+
+def online_payment_available(db: Session) -> bool:
+    """True only when the admin has turned it on AND Razorpay keys are
+    configured — this is what makes "Pay Online" quietly disappear from
+    checkout instead of erroring when keys haven't been set up yet."""
+    settings = get_settings()
+    if not settings.razorpay_configured:
+        return False
+    return get_setting(db, "payment_online_enabled") == "true"
 
 
 def get_all_settings(db: Session) -> dict[str, str]:
