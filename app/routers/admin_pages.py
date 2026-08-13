@@ -7,11 +7,11 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth import (
     clear_session_cookie,
     get_current_admin,
+    hash_password,
     require_admin,
     set_session_cookie,
     verify_password,
 )
-from app.config import get_settings
 from app.database import get_db
 from app.rate_limit import is_rate_limited
 from app.models import (
@@ -477,17 +477,7 @@ def product_toggle_active(product_id: int, db: Session = Depends(get_db), admin:
 @router.get("/settings")
 def settings_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
     values = get_all_settings(db)
-    razorpay_settings = get_settings()
-    return render_admin(
-        request,
-        "admin/settings.html",
-        {
-            "active_nav": "settings",
-            "values": values,
-            "razorpay_configured": razorpay_settings.razorpay_configured,
-        },
-        db,
-    )
+    return render_admin(request, "admin/settings.html", {"active_nav": "settings", "values": values}, db)
 
 
 @router.post("/settings")
@@ -503,7 +493,6 @@ def settings_submit(
     about_text: str = Form(""),
     contact_email: str = Form(""),
     contact_address: str = Form(""),
-    payment_online_enabled: bool = Form(False),
     db: Session = Depends(get_db),
     admin: Admin = Depends(require_admin),
 ):
@@ -520,7 +509,6 @@ def settings_submit(
             "about_text": about_text,
             "contact_email": contact_email.strip(),
             "contact_address": contact_address.strip(),
-            "payment_online_enabled": "true" if payment_online_enabled else "false",
         },
     )
     return RedirectResponse(url="/admin/settings", status_code=303)
@@ -635,3 +623,27 @@ def order_update_courier(
         order.notes = notes.strip() or None
         db.commit()
     return RedirectResponse(url=f"/admin/orders/{order_number}", status_code=303)
+
+
+# ---------- Customer accounts ----------
+
+@router.post("/customers/{customer_id}/reset-password")
+def customer_reset_password(
+    customer_id: int,
+    request: Request,
+    new_password: str = Form(...),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(require_admin),
+):
+    """
+    There's no self-service password reset (would need a paid SMS/email
+    service, contradicting the zero-cost requirement) — this is the manual
+    fallback: admin sets a temporary password and relays it to the customer
+    over WhatsApp/phone.
+    """
+    customer = db.get(Customer, customer_id)
+    referer = request.headers.get("referer", "/admin/orders")
+    if customer is not None and len(new_password) >= 8:
+        customer.password_hash = hash_password(new_password)
+        db.commit()
+    return RedirectResponse(url=referer, status_code=303)

@@ -92,11 +92,13 @@ from app.routers import (  # noqa: E402
     admin_pages,
     cart,
     checkout,
+    customer_auth,
     customer_pages,
     tracking,
 )
 
 app.include_router(customer_pages.router)
+app.include_router(customer_auth.router)
 app.include_router(cart.router)
 app.include_router(checkout.router)
 app.include_router(tracking.router)

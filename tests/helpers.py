@@ -1,6 +1,29 @@
 from app.cart_service import serialize_cart
 from app.cart_service import CART_COOKIE_NAME
-from app.models import Category, Product
+from app.models import Category, Customer, Product
+
+
+def make_customer(db, mobile="9000000001", name="Test Customer", password="testpass123"):
+    from app.auth import hash_password
+
+    customer = Customer(name=name, mobile=mobile, password_hash=hash_password(password))
+    db.add(customer)
+    db.commit()
+    db.refresh(customer)
+    return customer
+
+
+def customer_session_cookie(customer_id: int) -> dict:
+    from app.customer_auth import SESSION_COOKIE_NAME, create_session_token
+
+    return {SESSION_COOKIE_NAME: create_session_token(customer_id)}
+
+
+def checkout_cookies(items: dict, customer_id: int) -> dict:
+    """Cart cookie + logged-in customer session cookie, merged for one request."""
+    cookies = cart_cookie_header(items)
+    cookies.update(customer_session_cookie(customer_id))
+    return cookies
 
 
 def make_product(db, name="Test Product", price=100.0, stock=5, active=True, **kwargs):
@@ -37,9 +60,9 @@ def cart_cookie_header(items: dict) -> dict:
 
 
 def checkout_payload(idempotency_key: str, **overrides) -> dict:
+    """Name/mobile are no longer part of checkout — they come from the
+    logged-in customer's account (see checkout_cookies / make_customer)."""
     payload = {
-        "full_name": "Test Customer",
-        "mobile": "9876543210",
         "address": "123 Test Street",
         "city": "Chennai",
         "state": "Tamil Nadu",

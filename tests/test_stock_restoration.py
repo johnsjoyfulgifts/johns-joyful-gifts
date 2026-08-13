@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from app.auth import hash_password
 from app.database import SessionLocal
 from app.models import Admin
-from tests.helpers import cart_cookie_header, checkout_payload, make_product
+from tests.helpers import checkout_cookies, checkout_payload, make_customer, make_product
 
 
 def _login_as_admin(client: TestClient, email: str) -> None:
@@ -26,13 +26,15 @@ def test_cancelling_order_restores_stock(fastapi_app):
     db = SessionLocal()
     product = make_product(db, name="Cancel Restock Product", price=150.0, stock=5)
     product_id = product.id
+    customer = make_customer(db, mobile="9844400001")
+    customer_id = customer.id
     db.close()
 
     client = TestClient(fastapi_app)
     checkout_response = client.post(
         "/api/checkout",
         json=checkout_payload("cancel-restock-key"),
-        cookies=cart_cookie_header({product_id: 2}),
+        cookies=checkout_cookies({product_id: 2}, customer_id),
     )
     assert checkout_response.status_code == 200
     order_number = checkout_response.json()["order_number"]
@@ -65,13 +67,15 @@ def test_cancelling_twice_does_not_double_restore_stock(fastapi_app):
     db = SessionLocal()
     product = make_product(db, name="Double Cancel Product", price=90.0, stock=4)
     product_id = product.id
+    customer = make_customer(db, mobile="9844400002")
+    customer_id = customer.id
     db.close()
 
     client = TestClient(fastapi_app)
     checkout_response = client.post(
         "/api/checkout",
         json=checkout_payload("double-cancel-key"),
-        cookies=cart_cookie_header({product_id: 1}),
+        cookies=checkout_cookies({product_id: 1}, customer_id),
     )
     assert checkout_response.status_code == 200
     order_number = checkout_response.json()["order_number"]

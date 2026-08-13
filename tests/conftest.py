@@ -11,11 +11,6 @@ os.close(_db_fd)
 os.environ["DATABASE_URL"] = f"sqlite:///{_db_path}"
 os.environ["SECRET_KEY"] = "test-secret-key-not-for-production"
 os.environ["ENVIRONMENT"] = "development"
-# Fake but well-formed Razorpay creds so razorpay_configured is True and the
-# HMAC signature logic (a pure local computation) is testable without ever
-# making a real network call to Razorpay.
-os.environ["RAZORPAY_KEY_ID"] = "rzp_test_fake_key_id"
-os.environ["RAZORPAY_KEY_SECRET"] = "fake_test_secret_for_hmac_only"
 
 from app.config import get_settings  # noqa: E402
 

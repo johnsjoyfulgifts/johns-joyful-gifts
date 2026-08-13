@@ -7,31 +7,22 @@ PINCODE_RE = re.compile(r"^[0-9]{4,10}$")
 
 
 class CheckoutRequest(BaseModel):
-    full_name: str
-    mobile: str
+    """Name/mobile are NOT collected here — checkout requires a logged-in
+    customer, so those come from the account (Customer.name/mobile)."""
+
     address: str
     city: str
     state: str
     pincode: str
-    email: str | None = None
     delivery_instructions: str | None = None
     idempotency_key: str
-    payment_method: str = "cod"
 
-    @field_validator("full_name", "address", "city", "state")
+    @field_validator("address", "city", "state")
     @classmethod
     def not_blank(cls, value: str) -> str:
         value = value.strip()
         if not value:
             raise ValueError("This field is required.")
-        return value
-
-    @field_validator("mobile")
-    @classmethod
-    def valid_mobile(cls, value: str) -> str:
-        value = value.strip()
-        if not MOBILE_RE.match(value):
-            raise ValueError("Please enter a valid mobile number.")
         return value
 
     @field_validator("pincode")
@@ -50,19 +41,35 @@ class CheckoutRequest(BaseModel):
             raise ValueError("Invalid request.")
         return value
 
-    @field_validator("payment_method")
+
+class RegisterRequest(BaseModel):
+    name: str
+    mobile: str
+    password: str
+    email: str | None = None
+
+    @field_validator("name")
     @classmethod
-    def valid_payment_method(cls, value: str) -> str:
-        if value not in ("cod", "online"):
-            raise ValueError("Invalid payment method.")
+    def valid_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Please enter your name.")
         return value
 
+    @field_validator("mobile")
+    @classmethod
+    def valid_mobile(cls, value: str) -> str:
+        value = value.strip()
+        if not MOBILE_RE.match(value):
+            raise ValueError("Please enter a valid mobile number.")
+        return value
 
-class VerifyPaymentRequest(BaseModel):
-    order_number: str
-    razorpay_order_id: str
-    razorpay_payment_id: str
-    razorpay_signature: str
+    @field_validator("password")
+    @classmethod
+    def valid_password(cls, value: str) -> str:
+        if len(value) < 8:
+            raise ValueError("Password must be at least 8 characters.")
+        return value
 
 
 class TrackOrderRequest(BaseModel):

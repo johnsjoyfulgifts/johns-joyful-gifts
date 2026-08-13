@@ -9,20 +9,22 @@ import threading
 from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
-from tests.helpers import cart_cookie_header, checkout_payload, make_product
+from tests.helpers import checkout_cookies, checkout_payload, make_customer, make_product
 
 
 def test_sequential_retry_with_same_idempotency_key_returns_same_order(fastapi_app):
     db = SessionLocal()
     product = make_product(db, name="Duplicate Test Product", price=300.0, stock=10)
     product_id = product.id
+    customer = make_customer(db, mobile="9822200001")
+    customer_id = customer.id
     db.close()
 
     client = TestClient(fastapi_app)
     key = "same-key-retry-test"
 
     first = client.post(
-        "/api/checkout", json=checkout_payload(key), cookies=cart_cookie_header({product_id: 1})
+        "/api/checkout", json=checkout_payload(key), cookies=checkout_cookies({product_id: 1}, customer_id)
     )
     assert first.status_code == 200
     first_order_number = first.json()["order_number"]
@@ -31,7 +33,7 @@ def test_sequential_retry_with_same_idempotency_key_returns_same_order(fastapi_a
     # cleared by the first response, so re-supply it as the client would
     # still have it in sessionStorage/local state at retry time.
     second = client.post(
-        "/api/checkout", json=checkout_payload(key), cookies=cart_cookie_header({product_id: 1})
+        "/api/checkout", json=checkout_payload(key), cookies=checkout_cookies({product_id: 1}, customer_id)
     )
     assert second.status_code == 200
     assert second.json()["order_number"] == first_order_number
@@ -51,6 +53,8 @@ def test_truly_concurrent_double_submit_with_same_key_creates_one_order(fastapi_
     db = SessionLocal()
     product = make_product(db, name="Concurrent Duplicate Product", price=250.0, stock=10)
     product_id = product.id
+    customer = make_customer(db, mobile="9822200002")
+    customer_id = customer.id
     db.close()
 
     key = "concurrent-same-key"
@@ -61,7 +65,7 @@ def test_truly_concurrent_double_submit_with_same_key_creates_one_order(fastapi_
         client = TestClient(fastapi_app)
         barrier.wait()
         response = client.post(
-            "/api/checkout", json=checkout_payload(key), cookies=cart_cookie_header({product_id: 1})
+            "/api/checkout", json=checkout_payload(key), cookies=checkout_cookies({product_id: 1}, customer_id)
         )
         results.append(response)
 

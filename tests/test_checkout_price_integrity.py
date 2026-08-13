@@ -10,13 +10,15 @@ adding to cart and checking out, and that snapshots then stay frozen.
 from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
-from tests.helpers import cart_cookie_header, checkout_payload, make_product
+from tests.helpers import checkout_cookies, checkout_payload, make_customer, make_product
 
 
 def test_total_is_computed_from_current_server_side_price(fastapi_app):
     db = SessionLocal()
     product = make_product(db, name="Price Integrity Product", price=100.0, stock=10)
     product_id = product.id
+    customer = make_customer(db, mobile="9833300001")
+    customer_id = customer.id
     db.close()
 
     # Simulate the product's price changing after it was added to a cart
@@ -33,7 +35,7 @@ def test_total_is_computed_from_current_server_side_price(fastapi_app):
     response = client.post(
         "/api/checkout",
         json=checkout_payload("price-integrity-key"),
-        cookies=cart_cookie_header({product_id: 2}),
+        cookies=checkout_cookies({product_id: 2}, customer_id),
     )
     assert response.status_code == 200
     order_number = response.json()["order_number"]
@@ -53,13 +55,15 @@ def test_order_snapshot_survives_later_price_change(fastapi_app):
     db = SessionLocal()
     product = make_product(db, name="Snapshot Product", price=80.0, stock=10)
     product_id = product.id
+    customer = make_customer(db, mobile="9833300002")
+    customer_id = customer.id
     db.close()
 
     client = TestClient(fastapi_app)
     response = client.post(
         "/api/checkout",
         json=checkout_payload("snapshot-key"),
-        cookies=cart_cookie_header({product_id: 1}),
+        cookies=checkout_cookies({product_id: 1}, customer_id),
     )
     assert response.status_code == 200
     order_number = response.json()["order_number"]

@@ -7,20 +7,22 @@ and must never expose another customer's order.
 from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
-from tests.helpers import cart_cookie_header, checkout_payload, make_product
+from tests.helpers import checkout_cookies, checkout_payload, make_customer, make_product
 
 
 def _place_test_order(fastapi_app, mobile="9111111111"):
     db = SessionLocal()
     product = make_product(db, name="Tracking Test Product", price=100.0, stock=5)
     product_id = product.id
+    customer = make_customer(db, mobile=mobile)
+    customer_id = customer.id
     db.close()
 
     client = TestClient(fastapi_app)
     response = client.post(
         "/api/checkout",
-        json=checkout_payload(f"track-test-{mobile}", mobile=mobile),
-        cookies=cart_cookie_header({product_id: 1}),
+        json=checkout_payload(f"track-test-{mobile}"),
+        cookies=checkout_cookies({product_id: 1}, customer_id),
     )
     assert response.status_code == 200
     return response.json()["order_number"]

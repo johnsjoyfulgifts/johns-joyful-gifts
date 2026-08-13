@@ -117,16 +117,26 @@ class ProductImage(Base):
 
 
 class Customer(Base):
+    """
+    A customer account, identified by mobile number (the login). One row per
+    mobile — reused across every order that customer places, unlike orders
+    themselves, which snapshot delivery details independently (see Order
+    below) so editing a saved address here never rewrites past orders.
+    """
+
     __tablename__ = "customers"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(150))
-    mobile: Mapped[str] = mapped_column(String(20), index=True)
+    mobile: Mapped[str] = mapped_column(String(20), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    address: Mapped[str] = mapped_column(Text)
-    city: Mapped[str] = mapped_column(String(120))
-    state: Mapped[str] = mapped_column(String(120))
-    pincode: Mapped[str] = mapped_column(String(12))
+    # Saved/default address, used only to pre-fill checkout — not the source
+    # of truth for any past order (Order.delivery_* fields are).
+    address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    city: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    state: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    pincode: Mapped[str | None] = mapped_column(String(12), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     orders: Mapped[list["Order"]] = relationship(back_populates="customer")
@@ -138,6 +148,15 @@ class Order(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     order_number: Mapped[str] = mapped_column(String(40), unique=True, index=True)
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True)
+    # Delivery snapshot at the time THIS order was placed — independent of
+    # the customer's saved address, so a later profile edit (or a different
+    # shipping address on a future order) never changes this order's record.
+    delivery_name: Mapped[str] = mapped_column(String(150))
+    delivery_mobile: Mapped[str] = mapped_column(String(20))
+    delivery_address: Mapped[str] = mapped_column(Text)
+    delivery_city: Mapped[str] = mapped_column(String(120))
+    delivery_state: Mapped[str] = mapped_column(String(120))
+    delivery_pincode: Mapped[str] = mapped_column(String(12))
     subtotal: Mapped[float] = mapped_column(Float)
     delivery_charge: Mapped[float] = mapped_column(Float, default=0)
     total: Mapped[float] = mapped_column(Float)
@@ -151,8 +170,6 @@ class Order(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     viewed_by_admin: Mapped[bool] = mapped_column(Boolean, default=False)
-    razorpay_order_id: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
-    razorpay_payment_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
     stock_restored: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)

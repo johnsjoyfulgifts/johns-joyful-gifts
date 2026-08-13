@@ -10,29 +10,35 @@ import threading
 from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
-from tests.helpers import cart_cookie_header, checkout_payload, make_product
+from tests.helpers import checkout_cookies, checkout_payload, make_customer, make_product
 
 
 def test_concurrent_checkouts_cannot_oversell(fastapi_app):
     db = SessionLocal()
     product = make_product(db, name="Limited Teddy", price=500.0, stock=1)
     product_id = product.id
+    customer_a = make_customer(db, mobile="9811100001", name="Racer A")
+    customer_b = make_customer(db, mobile="9811100002", name="Racer B")
+    customer_a_id, customer_b_id = customer_a.id, customer_b.id
     db.close()
 
     results = []
     barrier = threading.Barrier(2)
 
-    def attempt_checkout(key_suffix: str):
+    def attempt_checkout(key_suffix: str, customer_id: int):
         client = TestClient(fastapi_app)
         barrier.wait()  # both threads fire as close to simultaneously as possible
         response = client.post(
             "/api/checkout",
-            json=checkout_payload(f"race-attempt-{key_suffix}", mobile=f"98765432{key_suffix}0"),
-            cookies=cart_cookie_header({product_id: 1}),
+            json=checkout_payload(f"race-attempt-{key_suffix}"),
+            cookies=checkout_cookies({product_id: 1}, customer_id),
         )
         results.append(response)
 
-    threads = [threading.Thread(target=attempt_checkout, args=(suffix,)) for suffix in ("1", "2")]
+    threads = [
+        threading.Thread(target=attempt_checkout, args=("1", customer_a_id)),
+        threading.Thread(target=attempt_checkout, args=("2", customer_b_id)),
+    ]
     for t in threads:
         t.start()
     for t in threads:
@@ -66,13 +72,15 @@ def test_checkout_rejects_when_stock_insufficient(fastapi_app):
     db = SessionLocal()
     product = make_product(db, name="Out Soon", price=200.0, stock=1)
     product_id = product.id
+    customer = make_customer(db, mobile="9811100003")
+    customer_id = customer.id
     db.close()
 
     client = TestClient(fastapi_app)
     response = client.post(
         "/api/checkout",
         json=checkout_payload("insufficient-stock-key"),
-        cookies=cart_cookie_header({product_id: 5}),  # wants 5, only 1 available
+        cookies=checkout_cookies({product_id: 5}, customer_id),  # wants 5, only 1 available
     )
     assert response.status_code == 409
     assert response.json().get("stock_issue") is True
@@ -89,12 +97,14 @@ def test_checkout_rejects_inactive_product(fastapi_app):
     db = SessionLocal()
     product = make_product(db, name="Discontinued Toy", price=150.0, stock=10, active=False)
     product_id = product.id
+    customer = make_customer(db, mobile="9811100004")
+    customer_id = customer.id
     db.close()
 
     client = TestClient(fastapi_app)
     response = client.post(
         "/api/checkout",
         json=checkout_payload("inactive-product-key"),
-        cookies=cart_cookie_header({product_id: 1}),
+        cookies=checkout_cookies({product_id: 1}, customer_id),
     )
     assert response.status_code == 409

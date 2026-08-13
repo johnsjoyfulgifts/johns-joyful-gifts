@@ -33,6 +33,11 @@
       </div>
       <div class="header-actions">
         <a class="icon-link" href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">💬</a>
+        {% if current_customer %}
+        <a class="icon-link" href="/account" aria-label="My Account, {{ current_customer.name }}">👤</a>
+        {% else %}
+        <a class="icon-link" href="/login" aria-label="Log In">👤</a>
+        {% endif %}
         <a class="icon-link" href="/cart" aria-label="View cart, {{ cart_count|default(0) }} items">
           🛒
           {% if cart_count %}<span class="cart-badge">{{ cart_count }}</span>{% endif %}

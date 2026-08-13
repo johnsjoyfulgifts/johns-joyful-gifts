@@ -23,6 +23,7 @@ templates.env.filters["tojson"] = _tojson_filter
 
 def _common_context(request, db: Session) -> dict:
     from app.cart_service import cart_totals, get_cart_lines
+    from app.customer_auth import get_current_customer
     from app.utils.whatsapp import whatsapp_chat_link
 
     store = get_all_settings(db)
@@ -37,6 +38,7 @@ def _common_context(request, db: Session) -> dict:
         "cart_count": cart_count,
         "whatsapp_chat_link": whatsapp_chat_link(store.get("whatsapp_number", "")),
         "current_year": datetime.now(timezone.utc).year,
+        "current_customer": get_current_customer(request, db),
     }
 
 

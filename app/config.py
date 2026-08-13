@@ -20,19 +20,9 @@ class Settings(BaseSettings):
 
     environment: str = "development"
 
-    # Razorpay is entirely optional: the app runs fine with these blank
-    # (online payment simply doesn't appear at checkout). key_secret is
-    # server-only and must never be sent to a template or the frontend.
-    razorpay_key_id: str = ""
-    razorpay_key_secret: str = ""
-
     @property
     def is_production(self) -> bool:
         return self.environment.lower() == "production"
-
-    @property
-    def razorpay_configured(self) -> bool:
-        return bool(self.razorpay_key_id and self.razorpay_key_secret)
 
 
 @lru_cache

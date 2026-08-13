@@ -17,11 +17,25 @@
     </div>
 
     <div class="card" style="margin-top:16px;">
-      <h2 style="font-size:1rem; margin-top:0;">Customer</h2>
-      <p><strong>{{ order.customer.name }}</strong></p>
-      <p>{{ order.customer.mobile }}{% if order.customer.email %} · {{ order.customer.email }}{% endif %}</p>
-      <p>{{ order.customer.address }}, {{ order.customer.city }}, {{ order.customer.state }} - {{ order.customer.pincode }}</p>
+      <h2 style="font-size:1rem; margin-top:0;">Deliver To</h2>
+      <p><strong>{{ order.delivery_name }}</strong></p>
+      <p>{{ order.delivery_mobile }}</p>
+      <p>{{ order.delivery_address }}, {{ order.delivery_city }}, {{ order.delivery_state }} - {{ order.delivery_pincode }}</p>
       {% if order.notes %}<p class="text-muted"><strong>Delivery instructions:</strong> {{ order.notes }}</p>{% endif %}
+      <p class="text-muted" style="font-size:0.8rem; margin-top:10px; border-top:1px solid var(--color-border); padding-top:8px;">
+        Account: {{ order.customer.name }} ({{ order.customer.mobile }}{% if order.customer.email %}, {{ order.customer.email }}{% endif %})
+      </p>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h2 style="font-size:1rem; margin-top:0;">Customer Account</h2>
+      <p class="text-muted" style="font-size:0.85rem;">No email/SMS reset is set up (keeps this app zero-cost) — if a customer forgets their password, set a temporary one here and share it with them over WhatsApp/phone.</p>
+      <form method="post" action="/admin/customers/{{ order.customer.id }}/reset-password" onsubmit="return confirm('Set a new temporary password for ' + {{ order.customer.mobile|tojson }} + '?');">
+        <div class="form-row form-row--2">
+          <input class="form-control" type="text" name="new_password" placeholder="New temporary password (min 8 chars)" minlength="8" required>
+          <button type="submit" class="btn btn-secondary">Reset Password</button>
+        </div>
+      </form>
     </div>
 
     <div class="card" style="margin-top:16px;">
