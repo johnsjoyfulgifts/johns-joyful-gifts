@@ -2,21 +2,18 @@ import os
 import sys
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-
 from alembic import context
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.config import get_settings  # noqa: E402
 from app.database import Base  # noqa: E402
+from app.database import engine as app_engine  # noqa: E402
 from app import models  # noqa: E402,F401  (import so all models register on Base.metadata)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -25,10 +22,11 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+# Deliberately not routed through config.set_main_option("sqlalchemy.url", ...):
+# configparser treats "%" as interpolation syntax, and the Supabase connection
+# string's password is URL-encoded (contains "%24" etc.), which crashes it.
+# Reusing the app's own engine (app.database.engine) sidesteps configparser
+# entirely and is also just simpler than rebuilding an engine from config here.
 
 
 def run_migrations_offline() -> None:
@@ -43,7 +41,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    url = get_settings().database_url
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -63,13 +61,7 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-
-    with connectable.connect() as connection:
+    with app_engine.connect() as connection:
         context.configure(
             connection=connection, target_metadata=target_metadata, render_as_batch=True
         )

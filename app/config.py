@@ -8,6 +8,8 @@ class Settings(BaseSettings):
 
     secret_key: str = "dev-only-insecure-secret-change-me"
     database_url: str = "sqlite:///./johns_joyful_gifts.db"
+    supabase_url: str = ""
+    supabase_service_key: str = ""
     upload_dir: str = "./uploads"
     max_upload_size_bytes: int = 5 * 1024 * 1024
 

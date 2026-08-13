@@ -24,7 +24,7 @@ def upgrade() -> None:
         batch_op.add_column(sa.Column('razorpay_order_id', sa.String(length=80), nullable=True))
         batch_op.add_column(sa.Column('razorpay_payment_id', sa.String(length=80), nullable=True))
         batch_op.add_column(
-            sa.Column('stock_restored', sa.Boolean(), nullable=False, server_default=sa.text('0'))
+            sa.Column('stock_restored', sa.Boolean(), nullable=False, server_default=sa.false())
         )
         batch_op.create_index(batch_op.f('ix_orders_razorpay_order_id'), ['razorpay_order_id'], unique=False)
 

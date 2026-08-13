@@ -25,13 +25,14 @@ Every piece of this app was chosen specifically to avoid any ongoing cost:
 
 | Need | What's used | Cost |
 |---|---|---|
-| Backend/hosting | FastAPI (Python), deployable on Fly.io's free allowance | Free |
-| Database | SQLite (a file, not a hosted service) | Free |
-| Image storage | Local disk on the same host | Free |
+| Source control | GitHub (private repo) | Free |
+| Backend/hosting | FastAPI (Python) on Render's free Web Service tier | Free |
+| Database | Supabase Postgres (free tier, 500MB) | Free |
+| Image storage | Supabase Storage (free tier, 1GB) | Free |
 | Authentication | Self-hosted password hashing (bcrypt), no third-party auth service | Free |
 | Customer contact | `wa.me` WhatsApp deep links (not the paid WhatsApp Business API) | Free |
 | Payment | Cash on Delivery | Free |
-| Domain | Free hosting subdomain (e.g. `*.fly.dev`) — no domain purchase needed | Free |
+| Domain | Free hosting subdomain (`*.onrender.com`) — no domain purchase needed | Free |
 
 An earlier version of this app included an optional Razorpay online-payment
 integration. It was **removed entirely** (not just disabled) because every
@@ -43,9 +44,10 @@ UPI option (show a UPI ID or QR code at checkout, customer pays directly with
 any UPI app, admin manually confirms) — not built here, but straightforward
 to add later without needing any of this app's other pieces to change.
 
-**Free-tier limits still apply** — see "Free Deployment (Fly.io)" below. Free
-doesn't mean unlimited: Fly.io's free allowance is a fixed amount of compute
-and storage, sufficient for a small shop but worth monitoring as it grows.
+**Free-tier limits still apply** — see "Free Deployment (Render + Supabase)"
+below. Free doesn't mean unlimited: Render's and Supabase's free allowances
+are fixed amounts of compute/database/storage, sufficient for a small shop
+but worth monitoring as it grows.
 
 ## Architecture
 
@@ -56,11 +58,11 @@ no Node.js required at all:
 - **Interactivity**: vanilla JS (`app/static/js/cart.js`) progressively enhances
   plain HTML forms — every action (add to cart, checkout, update order status)
   still works as a normal form POST if JavaScript fails.
-- **Database**: SQLite via SQLAlchemy, with a dedicated locking strategy for
-  order creation (see "Inventory safety" below).
-- **Images**: stored on local disk under `uploads/`, served by FastAPI, behind
-  a small abstraction (`app/storage.py`) so it can be swapped for S3/Cloudinary
-  later without touching route code.
+- **Database**: Postgres (Supabase, free tier) via SQLAlchemy, with row-level
+  locking for order creation (see "Inventory safety" below).
+- **Images**: stored in Supabase Storage (a free-tier S3-like object store),
+  behind a small abstraction (`app/storage.py`) so the storage backend can
+  change again later without touching route code.
 - **Auth**: signed, httpOnly session cookie for admin login (`app/auth.py`),
   bcrypt password hashing. No third-party auth service.
 
@@ -75,19 +77,20 @@ architecture" and "zero mandatory cost" requirements.
 
 Stock must never be oversold — e.g. if stock is 2 and two customers both try
 to buy 2 at nearly the same moment, only one may succeed. This is implemented
-in `app/database.py` / `app/routers/checkout.py`:
+in `app/routers/checkout.py` using Postgres row-level locking:
 
-- A **second SQLAlchemy engine** (`write_engine`), used only for order
-  creation, is configured to issue `BEGIN IMMEDIATE` instead of SQLite's
-  default deferred transaction — it takes the write lock the instant the
-  transaction starts.
-- Two concurrent checkouts for the same product **serialize**: the second one
-  blocks until the first commits or rolls back, then re-reads genuinely
-  current stock. There is no window where both can read stale stock and both
-  succeed.
-- Ordinary reads (page views, admin lists) stay on the main `engine` with
-  plain deferred transactions in WAL mode, so they're never blocked by a
-  checkout in progress.
+- The order-creation transaction queries every product in the cart with
+  `SELECT ... FOR UPDATE` (`.with_for_update()`), which locks **only those
+  specific product rows** for the rest of the transaction.
+- Two concurrent checkouts that share a product **serialize** on that
+  product: the second blocks until the first commits or rolls back, then
+  re-reads genuinely current stock. There is no window where both can read
+  stale stock and both succeed. Checkouts for *unrelated* products are never
+  blocked by each other — a strict improvement over locking the whole
+  database.
+- Order-number generation (`app/utils/order_number.py`) uses a separate
+  `pg_advisory_xact_lock` keyed by date, since it does a count-then-format
+  over the `orders` table rather than touching product rows.
 - This is covered by an automated, real-concurrency test:
   `tests/test_inventory_safety.py::test_concurrent_checkouts_cannot_oversell`.
 
@@ -157,24 +160,28 @@ Copy `.env.example` to `.env` and fill in real values:
 | Variable | Purpose |
 |---|---|
 | `SECRET_KEY` | Signs admin session + cart cookies. Generate with `python -c "import secrets; print(secrets.token_hex(32))"`. **Must** be changed for production. |
-| `DATABASE_URL` | SQLite file path, e.g. `sqlite:///./johns_joyful_gifts.db`. |
-| `UPLOAD_DIR` | Folder for product images, e.g. `./uploads`. |
+| `DATABASE_URL` | Supabase Postgres **Session pooler** connection string (Project Settings → Database). The direct connection is IPv6-only and won't resolve from most networks/hosts — always use the pooler URL. |
+| `SUPABASE_URL` | Supabase project URL (Project Settings → API), e.g. `https://xxxx.supabase.co`. |
+| `SUPABASE_SERVICE_KEY` | Supabase `service_role`/"secret" key (Project Settings → API) — used server-side for Storage uploads. Never expose this to the frontend. |
+| `UPLOAD_DIR` | Unused in production (images go to Supabase Storage); kept only as a legacy local-dev fallback path. |
 | `MAX_UPLOAD_SIZE_BYTES` | Per-image upload limit (default 5 MB). |
 | `STORE_NAME`, `STORE_TAGLINE`, `WHATSAPP_NUMBER`, `INSTAGRAM_URL`, `DEFAULT_DELIVERY_CHARGE`, `FREE_DELIVERY_THRESHOLD` | Initial defaults — all editable later from `/admin/settings` without redeploying. |
 | `ENVIRONMENT` | Set to `production` to enable secure (HTTPS-only) cookies. |
 
 ## Database Setup
 
-Migrations are managed with Alembic.
+Migrations are managed with Alembic, applied against your Supabase Postgres
+database (via `DATABASE_URL`).
 
 ```bash
 alembic upgrade head
 ```
 
-This creates `johns_joyful_gifts.db` (or your configured path) with the full
-schema. Re-run `alembic upgrade head` after pulling any future migration —
-it only ever applies forward, additive changes; it will never drop or reset
-existing data.
+This creates the full schema in your Supabase project. Re-run
+`alembic upgrade head` after pulling any future migration — it only ever
+applies forward, additive changes; it will never drop or reset existing data.
+(The Dockerfile also runs this automatically on every deploy, before the app
+starts.)
 
 To add demo products for testing (never run this against a real store's
 database):
@@ -217,8 +224,9 @@ that pricing/stock are always server-computed, stock restoration on order
 cancellation, and the customer-account system (registration validation,
 login, checkout genuinely blocked — both the page and the API — when logged
 out, and that repeat orders from one customer reuse a single account while
-keeping independent delivery-address snapshots). All 26 tests pass, and the
-concurrency tests were run repeatedly to confirm they aren't flaky.
+keeping independent delivery-address snapshots). All 39 tests pass against
+the live Supabase Postgres database, and the concurrency tests were run
+repeatedly to confirm they aren't flaky.
 
 Beyond the automated suite, the full customer journey (browse → cart →
 checkout → order success → track) and full admin journey (login → add
@@ -244,68 +252,65 @@ Run with a production ASGI server, e.g.:
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
 ```
 
-## Free Deployment (Fly.io)
+## Free Deployment (Render + Supabase)
 
-Fly.io's free allowance includes a small persistent volume, which SQLite and
-the local `uploads/` folder both need to survive restarts/redeploys — most
-other free tiers (e.g. Vercel) only offer ephemeral storage, which would lose
-your database and product photos on every deploy.
+Render's free Web Service tier has **no persistent disk** — anything written
+to local disk (a SQLite file, an `uploads/` folder) would be wiped on every
+restart/redeploy. That's why the database and product images both live in
+Supabase instead (Postgres + Storage), which has its own persistent
+infrastructure; Render only runs the stateless FastAPI app itself.
 
-**This app is deployed and live at https://johns-joyful-gifts.fly.dev.**
-`fly.toml` in this repo is the actual config used. To redeploy after making
-changes:
+**GitHub repo**: https://github.com/johnsjoyfulgifts/johns-joyful-gifts
+(private) — Render deploys straight from this repo.
 
-```bash
-flyctl deploy --app johns-joyful-gifts
-```
+To set up from scratch (e.g. a fork, or a new Render account):
 
-To set it up from scratch (e.g. a fork, or after deleting the Fly app):
-
-1. Sign up at [fly.io](https://fly.io) — **a card is required even for
-   free-tier usage** (Fly's anti-abuse policy, not a fee if you stay within
-   the free allowance). Brand-new accounts are sometimes flagged "high risk"
-   and need a one-time manual verification at
-   [fly.io/high-risk-unlock](https://fly.io/high-risk-unlock) before any
-   machine can launch — if `fly launch`/`fly deploy` fails with a "high risk"
-   or "exceeds organization limit" error, this is why.
-2. Install flyctl, then `flyctl auth login` (needs a real interactive
-   terminal — won't work piped through another tool).
-3. `flyctl launch --no-deploy --ha=false` from this directory (Dockerfile is
-   auto-detected). **Check the generated `fly.toml`'s `[[vm]]` block** — Fly
-   sometimes defaults to `memory_mb = 1024` (1GB), which exceeds the free
-   allowance (3× `shared-cpu-1x 256MB`). This repo's `fly.toml` is already
-   set to `memory_mb = 256`.
-4. `flyctl volumes create data --size 1` — the persistent volume SQLite and
-   `uploads/` need to survive restarts/redeploys.
-5. `flyctl secrets set SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")`.
-6. `flyctl deploy`.
-7. Create the first admin and (optionally) seed demo products:
+1. **Supabase** — sign up at [supabase.com](https://supabase.com) (free,
+   no card). Create a project, then from the dashboard collect:
+   - Project Settings → Database → **Session pooler** connection string
+     (not the direct connection — that's IPv6-only) → `DATABASE_URL`.
+   - Project Settings → API → Project URL → `SUPABASE_URL`, and the
+     `service_role`/"secret" key → `SUPABASE_SERVICE_KEY`.
+   - Storage → create a bucket named `product-images`, set **Public**.
+2. **Render** — sign up at [render.com](https://render.com) (free, no card).
+   New → Web Service → connect the GitHub repo above. Render reads
+   `render.yaml` in this repo automatically (Docker runtime, free plan). When
+   prompted, fill in the env vars marked `sync: false` in `render.yaml`:
+   `SECRET_KEY` (generate with
+   `python -c "import secrets; print(secrets.token_hex(32))"`),
+   `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` (all from step 1).
+3. Deploy. The Dockerfile's `CMD` runs `alembic upgrade head` automatically
+   before starting the app, so the schema is created on first deploy.
+4. Push to the connected branch to redeploy — Render rebuilds and deploys
+   automatically on every push, no manual `deploy` command needed.
+5. Create the first admin (run once, locally, pointed at the same
+   `DATABASE_URL` your Render service uses):
    ```bash
-   flyctl ssh console -C "python scripts/create_admin.py"
-   flyctl ssh console -C "python scripts/seed_demo_data.py"
+   python scripts/create_admin.py
    ```
-   (`create_admin.py` prompts interactively — if that's awkward over SSH,
-   inline a short Python one-liner instead, same idea as the script.)
 
-**Free-tier limits to be aware of** (spec §54): Fly.io's free allowance is not
-unlimited traffic/compute/storage forever — 3× `shared-cpu-1x 256MB` VMs and
-3GB of volume storage total, sufficient for a small shop's traffic but worth
-monitoring as the business grows. `min_machines_running = 0` in `fly.toml`
-means the machine stops when idle and restarts on the next request (a few
-seconds' delay on a cold request) — this keeps compute usage minimal and
-comfortably inside the free allowance rather than running 24/7.
+**Free-tier limits to be aware of**: Render's free Web Service gives 750
+compute-hours/month and sleeps after 15 minutes idle (30-60s cold start on
+the next request — the same cold-start trade-off most free hosts have).
+Supabase's free tier gives 500MB Postgres storage and 1GB file storage, and
+**pauses a project after 7 days of zero activity** (one click to resume in
+the dashboard; no data is lost). All sufficient for a small shop's traffic,
+worth monitoring as the business grows.
 
 ## Backup
 
-Since everything lives in one SQLite file plus the `uploads/` folder,
-backup is just copying those two things periodically:
+The database lives in Supabase Postgres; product images live in Supabase
+Storage. Back up the database with `pg_dump` against the same connection
+string as `DATABASE_URL`:
 
 ```bash
-fly ssh sftp get /data/johns_joyful_gifts.db ./backup-$(date +%Y%m%d).db
+pg_dump "postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres" > backup-$(date +%Y%m%d).sql
 ```
 
-(or the equivalent file copy on whatever host you use). Do this on a schedule
-appropriate to your order volume — daily is reasonable for a small shop.
+Do this on a schedule appropriate to your order volume — daily is reasonable
+for a small shop. Product images in the `product-images` Storage bucket can
+be downloaded in bulk from the Supabase dashboard (Storage → bucket →
+download) if you want an offline copy.
 
 ## Troubleshooting
 
@@ -313,20 +318,20 @@ appropriate to your order volume — daily is reasonable for a small shop.
   8 hours; just log back in at `/admin/login`.
 - **Blank/500 page** — check server logs; customers only ever see a friendly
   message, but the real error and stack trace are always logged server-side.
-- **Images not showing after deploy** — confirm `UPLOAD_DIR` points at a
-  path on your persistent volume, not ephemeral local disk.
-- **"database is locked" errors under heavy load** — SQLite is fine for a
-  small shop's order volume; if this becomes frequent, see "Future
-  Improvements" below.
+- **Images not showing after deploy** — confirm `SUPABASE_URL` and
+  `SUPABASE_SERVICE_KEY` are set correctly and the `product-images` bucket
+  is set to **Public** in the Supabase dashboard.
+- **Slow first request after idle** — both Render (free Web Service) and
+  Supabase (project pause after 7 days idle) can need 30-60s to wake up on
+  the first request after a period of no traffic. This is expected on free
+  tiers, not a bug.
 
 ## Future Improvements
 
 The storage and settings layers are deliberately abstracted so these can be
 added later without a rewrite:
 
-- Swap SQLite for hosted Postgres (e.g. Neon/Supabase free tier) if order
-  volume grows enough that SQLite's single-writer model becomes limiting.
-- Swap local image storage for S3/Cloudinary via `app/storage.py`.
+- Swap Supabase Storage for another provider via `app/storage.py` if needed.
 - A free manual-UPI payment option (show a UPI ID/QR code at checkout, admin
   confirms payment manually) if online payment is wanted without reintroducing
   gateway fees — see "Zero-Cost Guarantee" above.

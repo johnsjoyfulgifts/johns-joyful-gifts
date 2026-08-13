@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.cart_service import cart_totals, clear_cart, get_cart_lines, read_cart
 from app.customer_auth import require_customer, require_customer_api
-from app.database import get_db, immediate_write_session
+from app.database import get_db
 from app.models import Customer, Order, OrderItem, OrderStatus, OrderStatusHistory, Product
 from app.qr import generate_qr_png_bytes, upi_payment_uri
 from app.schemas import CheckoutRequest
@@ -87,85 +87,101 @@ async def api_checkout(
     product_ids = [int(pid) for pid in raw_cart.keys()]
 
     try:
-        with immediate_write_session() as write_db:
-            products = write_db.query(Product).filter(Product.id.in_(product_ids)).all()
-            products_by_id = {p.id: p for p in products}
+        # SELECT ... FOR UPDATE takes a row-level lock on exactly these
+        # products for the rest of this transaction, so a second concurrent
+        # checkout touching the same product blocks here until this one
+        # commits (then re-reads genuinely current stock) instead of both
+        # reading stale stock and both succeeding — the "last 2 units, two
+        # simultaneous buyers" oversell scenario. Ordering by id gives every
+        # checkout the same lock-acquisition order, which avoids deadlocks
+        # when two orders share more than one product.
+        products = (
+            db.query(Product)
+            .filter(Product.id.in_(product_ids))
+            .order_by(Product.id)
+            .with_for_update()
+            .all()
+        )
+        products_by_id = {p.id: p for p in products}
 
-            order_items_data = []
-            problems = []
-            for pid_str, qty in raw_cart.items():
-                pid = int(pid_str)
-                product = products_by_id.get(pid)
-                if product is None or not product.active:
-                    problems.append("One of the items in your cart is no longer available.")
-                    continue
-                if product.stock < qty:
-                    if product.stock <= 0:
-                        problems.append(f"'{product.name}' just went out of stock.")
-                    else:
-                        problems.append(f"Only {product.stock} of '{product.name}' left in stock.")
-                    continue
-                order_items_data.append((product, qty))
+        order_items_data = []
+        problems = []
+        for pid_str, qty in raw_cart.items():
+            pid = int(pid_str)
+            product = products_by_id.get(pid)
+            if product is None or not product.active:
+                problems.append("One of the items in your cart is no longer available.")
+                continue
+            if product.stock < qty:
+                if product.stock <= 0:
+                    problems.append(f"'{product.name}' just went out of stock.")
+                else:
+                    problems.append(f"Only {product.stock} of '{product.name}' left in stock.")
+                continue
+            order_items_data.append((product, qty))
 
-            if problems or not order_items_data:
-                raise _StockProblem(" ".join(problems) or "Your cart is empty.")
+        if problems or not order_items_data:
+            raise _StockProblem(" ".join(problems) or "Your cart is empty.")
 
-            subtotal = round(sum(product.price * qty for product, qty in order_items_data), 2)
-            delivery_charge = compute_delivery_charge(write_db, subtotal)
-            total = round(subtotal + delivery_charge, 2)
+        subtotal = round(sum(product.price * qty for product, qty in order_items_data), 2)
+        delivery_charge = compute_delivery_charge(db, subtotal)
+        total = round(subtotal + delivery_charge, 2)
 
-            order = Order(
-                order_number=generate_order_number(write_db),
-                customer_id=customer.id,
-                delivery_name=customer.name,
-                delivery_mobile=customer.mobile,
-                delivery_address=checkout_data.address,
-                delivery_city=checkout_data.city,
-                delivery_state=checkout_data.state,
-                delivery_pincode=checkout_data.pincode,
-                subtotal=subtotal,
-                delivery_charge=delivery_charge,
-                total=total,
-                payment_method=MANUAL_PAYMENT_METHOD_LABEL if checkout_data.payment_method == "manual" else "Cash on Delivery",
-                payment_status="Pending",
-                order_status=OrderStatus.PLACED.value,
-                notes=checkout_data.delivery_instructions or None,
-                idempotency_key=checkout_data.idempotency_key,
-            )
-            write_db.add(order)
-            write_db.flush()
+        order = Order(
+            order_number=generate_order_number(db),
+            customer_id=customer.id,
+            delivery_name=customer.name,
+            delivery_mobile=customer.mobile,
+            delivery_address=checkout_data.address,
+            delivery_city=checkout_data.city,
+            delivery_state=checkout_data.state,
+            delivery_pincode=checkout_data.pincode,
+            subtotal=subtotal,
+            delivery_charge=delivery_charge,
+            total=total,
+            payment_method=MANUAL_PAYMENT_METHOD_LABEL if checkout_data.payment_method == "manual" else "Cash on Delivery",
+            payment_status="Pending",
+            order_status=OrderStatus.PLACED.value,
+            notes=checkout_data.delivery_instructions or None,
+            idempotency_key=checkout_data.idempotency_key,
+        )
+        db.add(order)
+        db.flush()
 
-            for product, qty in order_items_data:
-                write_db.add(
-                    OrderItem(
-                        order_id=order.id,
-                        product_id=product.id,
-                        product_name_snapshot=product.name,
-                        price_snapshot=product.price,
-                        quantity=qty,
-                        subtotal=round(product.price * qty, 2),
-                    )
+        for product, qty in order_items_data:
+            db.add(
+                OrderItem(
+                    order_id=order.id,
+                    product_id=product.id,
+                    product_name_snapshot=product.name,
+                    price_snapshot=product.price,
+                    quantity=qty,
+                    subtotal=round(product.price * qty, 2),
                 )
-                product.stock -= qty
+            )
+            product.stock -= qty
 
-            write_db.add(OrderStatusHistory(order_id=order.id, status=OrderStatus.PLACED.value))
+        db.add(OrderStatusHistory(order_id=order.id, status=OrderStatus.PLACED.value))
 
-            # Keep the account's saved address current so next checkout
-            # pre-fills with wherever they most recently shipped to. Purely
-            # a convenience default — never affects this or any past order.
-            account = write_db.get(Customer, customer.id)
-            account.address = checkout_data.address
-            account.city = checkout_data.city
-            account.state = checkout_data.state
-            account.pincode = checkout_data.pincode
+        # Keep the account's saved address current so next checkout
+        # pre-fills with wherever they most recently shipped to. Purely
+        # a convenience default — never affects this or any past order.
+        account = db.get(Customer, customer.id)
+        account.address = checkout_data.address
+        account.city = checkout_data.city
+        account.state = checkout_data.state
+        account.pincode = checkout_data.pincode
 
-            order_number = order.order_number
+        order_number = order.order_number
+        db.commit()
     except _StockProblem as exc:
+        db.rollback()
         return JSONResponse({"detail": str(exc), "stock_issue": True}, status_code=409)
     except IntegrityError:
         # Two truly concurrent submits with the same idempotency key: the
         # loser's INSERT hits the UNIQUE constraint. Not an error for the
         # user — the order was created by the other request; return it.
+        db.rollback()
         winner = db.query(Order).filter(Order.idempotency_key == checkout_data.idempotency_key).first()
         if winner is not None:
             return _order_number_response(winner)
