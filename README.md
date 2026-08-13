@@ -251,26 +251,49 @@ the local `uploads/` folder both need to survive restarts/redeploys — most
 other free tiers (e.g. Vercel) only offer ephemeral storage, which would lose
 your database and product photos on every deploy.
 
-1. Install the Fly CLI and run `fly launch` from this directory (choose "no"
-   when it offers to set up a Postgres database — this app uses SQLite).
-2. Create a volume for persistent data: `fly volumes create data --size 1`.
-3. In `fly.toml`, mount it, e.g.:
-   ```toml
-   [mounts]
-     source = "data"
-     destination = "/data"
+**This app is deployed and live at https://johns-joyful-gifts.fly.dev.**
+`fly.toml` in this repo is the actual config used. To redeploy after making
+changes:
+
+```bash
+flyctl deploy --app johns-joyful-gifts
+```
+
+To set it up from scratch (e.g. a fork, or after deleting the Fly app):
+
+1. Sign up at [fly.io](https://fly.io) — **a card is required even for
+   free-tier usage** (Fly's anti-abuse policy, not a fee if you stay within
+   the free allowance). Brand-new accounts are sometimes flagged "high risk"
+   and need a one-time manual verification at
+   [fly.io/high-risk-unlock](https://fly.io/high-risk-unlock) before any
+   machine can launch — if `fly launch`/`fly deploy` fails with a "high risk"
+   or "exceeds organization limit" error, this is why.
+2. Install flyctl, then `flyctl auth login` (needs a real interactive
+   terminal — won't work piped through another tool).
+3. `flyctl launch --no-deploy --ha=false` from this directory (Dockerfile is
+   auto-detected). **Check the generated `fly.toml`'s `[[vm]]` block** — Fly
+   sometimes defaults to `memory_mb = 1024` (1GB), which exceeds the free
+   allowance (3× `shared-cpu-1x 256MB`). This repo's `fly.toml` is already
+   set to `memory_mb = 256`.
+4. `flyctl volumes create data --size 1` — the persistent volume SQLite and
+   `uploads/` need to survive restarts/redeploys.
+5. `flyctl secrets set SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")`.
+6. `flyctl deploy`.
+7. Create the first admin and (optionally) seed demo products:
+   ```bash
+   flyctl ssh console -C "python scripts/create_admin.py"
+   flyctl ssh console -C "python scripts/seed_demo_data.py"
    ```
-4. Set `DATABASE_URL=sqlite:////data/johns_joyful_gifts.db` and
-   `UPLOAD_DIR=/data/uploads` as Fly secrets/env vars, along with `SECRET_KEY`
-   and `ENVIRONMENT=production`.
-5. `fly deploy`, then run migrations and create the first admin via
-   `fly ssh console` (`alembic upgrade head`, `python scripts/create_admin.py`).
+   (`create_admin.py` prompts interactively — if that's awkward over SSH,
+   inline a short Python one-liner instead, same idea as the script.)
 
 **Free-tier limits to be aware of** (spec §54): Fly.io's free allowance is not
-unlimited traffic/compute/storage forever — it's a small number of shared-cpu
-VMs and a few GB of volume storage, sufficient for a small shop's traffic but
-worth monitoring as the business grows. The app stays lightweight (SQLite,
-no heavy dependencies) specifically so it fits comfortably within that.
+unlimited traffic/compute/storage forever — 3× `shared-cpu-1x 256MB` VMs and
+3GB of volume storage total, sufficient for a small shop's traffic but worth
+monitoring as the business grows. `min_machines_running = 0` in `fly.toml`
+means the machine stops when idle and restarts on the next request (a few
+seconds' delay on a cold request) — this keeps compute usage minimal and
+comfortably inside the free allowance rather than running 24/7.
 
 ## Backup
 
