@@ -13,7 +13,16 @@
       <div class="cart-summary-row"><span>Subtotal</span><span>₹{{ "%.0f"|format(order.subtotal) }}</span></div>
       <div class="cart-summary-row"><span>Delivery</span><span>{{ '₹%.0f'|format(order.delivery_charge) if order.delivery_charge else 'FREE' }}</span></div>
       <div class="cart-summary-row cart-summary-row--total"><span>Total</span><span>₹{{ "%.0f"|format(order.total) }}</span></div>
-      <p class="text-muted" style="font-size:0.85rem; margin-top:8px;">Payment: {{ order.payment_method }} ({{ order.payment_status }})</p>
+      <div class="flex items-center gap-8" style="margin-top:8px; flex-wrap:wrap;">
+        <p class="text-muted" style="font-size:0.85rem; margin:0;">Payment: {{ order.payment_method }} ({{ order.payment_status }})</p>
+        {% if order.payment_status != "Paid" %}
+        <form method="post" action="/admin/orders/{{ order.order_number }}/mark-paid" onsubmit="return confirm('Mark this order as Paid? Only do this after confirming payment yourself.');">
+          <button type="submit" class="btn btn-sm btn-secondary">Mark as Paid</button>
+        </form>
+        {% else %}
+        <span class="badge badge--success">Paid</span>
+        {% endif %}
+      </div>
     </div>
 
     <div class="card" style="margin-top:16px;">

@@ -58,6 +58,43 @@
       </div>
     </div>
 
+    <h2 style="font-size:1rem;">Manual Payment (UPI / Bank Transfer)</h2>
+    <p class="field-hint" style="margin-top:-6px;">
+      Free — no gateway, no fees. Customers pay you directly; you confirm payment yourself and mark the order Paid.
+    </p>
+    <div class="form-group">
+      <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+        <input type="checkbox" name="manual_payment_enabled" value="true" {{ 'checked' if values.manual_payment_enabled == 'true' }}>
+        Offer "UPI / Bank Transfer" at checkout, alongside Cash on Delivery
+      </label>
+      <p class="field-hint">Only appears at checkout once you've filled in a UPI ID or bank details below.</p>
+    </div>
+    <div class="form-group">
+      <label for="upi_id">Your UPI ID</label>
+      <input class="form-control" id="upi_id" name="upi_id" value="{{ values.upi_id }}" placeholder="yourshop@okhdfcbank">
+      <p class="field-hint">Customers get a scannable QR code generated from this automatically.</p>
+    </div>
+    <div class="form-row form-row--2">
+      <div class="form-group">
+        <label for="bank_account_name">Bank Account Name</label>
+        <input class="form-control" id="bank_account_name" name="bank_account_name" value="{{ values.bank_account_name }}">
+      </div>
+      <div class="form-group">
+        <label for="bank_account_number">Bank Account Number</label>
+        <input class="form-control" id="bank_account_number" name="bank_account_number" value="{{ values.bank_account_number }}">
+      </div>
+    </div>
+    <div class="form-row form-row--2">
+      <div class="form-group">
+        <label for="bank_ifsc">IFSC Code</label>
+        <input class="form-control" id="bank_ifsc" name="bank_ifsc" value="{{ values.bank_ifsc }}">
+      </div>
+      <div class="form-group">
+        <label for="bank_name">Bank Name</label>
+        <input class="form-control" id="bank_name" name="bank_name" value="{{ values.bank_name }}">
+      </div>
+    </div>
+
     <h2 style="font-size:1rem;">About Page</h2>
     <div class="form-group">
       <label for="about_text">About Us Text</label>

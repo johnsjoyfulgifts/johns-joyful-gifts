@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
@@ -8,13 +8,16 @@ from app.cart_service import cart_totals, clear_cart, get_cart_lines, read_cart
 from app.customer_auth import require_customer, require_customer_api
 from app.database import get_db, immediate_write_session
 from app.models import Customer, Order, OrderItem, OrderStatus, OrderStatusHistory, Product
+from app.qr import generate_qr_png_bytes, upi_payment_uri
 from app.schemas import CheckoutRequest
-from app.settings_service import compute_delivery_charge, get_setting
+from app.settings_service import compute_delivery_charge, get_all_settings, get_setting, manual_payment_available
 from app.templating import render
 from app.utils.order_number import generate_order_number
 from app.utils.whatsapp import order_confirmation_message, whatsapp_chat_link
 
 router = APIRouter()
+
+MANUAL_PAYMENT_METHOD_LABEL = "UPI / Bank Transfer"
 
 
 class _StockProblem(Exception):
@@ -36,6 +39,7 @@ def checkout_page(request: Request, db: Session = Depends(get_db), customer: Cus
             "item_count": item_count,
             "delivery_charge": delivery_charge,
             "total": round(subtotal + delivery_charge, 2),
+            "manual_payment_available": manual_payment_available(db),
         },
         db,
     )
@@ -67,6 +71,12 @@ async def api_checkout(
             else "Please check the information you entered."
         )
         return JSONResponse({"detail": message}, status_code=422)
+
+    # Never trust the client's claim that manual payment is configured —
+    # re-check server-side in case the admin turned it off after the page
+    # loaded, and silently fall back to COD rather than failing checkout.
+    if checkout_data.payment_method == "manual" and not manual_payment_available(db):
+        checkout_data.payment_method = "cod"
 
     # Fast-path idempotency check on the ordinary (read-only) session — if a
     # previous attempt with this key already succeeded, just return it.
@@ -116,7 +126,7 @@ async def api_checkout(
                 subtotal=subtotal,
                 delivery_charge=delivery_charge,
                 total=total,
-                payment_method="Cash on Delivery",
+                payment_method=MANUAL_PAYMENT_METHOD_LABEL if checkout_data.payment_method == "manual" else "Cash on Delivery",
                 payment_status="Pending",
                 order_status=OrderStatus.PLACED.value,
                 notes=checkout_data.delivery_instructions or None,
@@ -178,5 +188,35 @@ def order_success(order_number: str, request: Request, db: Session = Depends(get
 
     store_whatsapp = get_setting(db, "whatsapp_number")
     share_link = whatsapp_chat_link(store_whatsapp, order_confirmation_message(order))
+    settings_values = get_all_settings(db)
 
-    return render(request, "customer/order_success.html", {"order": order, "whatsapp_share_link": share_link}, db)
+    return render(
+        request,
+        "customer/order_success.html",
+        {
+            "order": order,
+            "whatsapp_share_link": share_link,
+            "upi_id": settings_values.get("upi_id", ""),
+            "bank_account_name": settings_values.get("bank_account_name", ""),
+            "bank_account_number": settings_values.get("bank_account_number", ""),
+            "bank_ifsc": settings_values.get("bank_ifsc", ""),
+            "bank_name": settings_values.get("bank_name", ""),
+        },
+        db,
+    )
+
+
+@router.get("/order/{order_number}/payment-qr.png")
+def order_payment_qr(order_number: str, db: Session = Depends(get_db)):
+    order = db.query(Order).filter(Order.order_number == order_number).first()
+    if order is None or order.payment_method != MANUAL_PAYMENT_METHOD_LABEL:
+        return Response(status_code=404)
+
+    upi_id = get_setting(db, "upi_id").strip()
+    if not upi_id:
+        return Response(status_code=404)
+
+    store_name = get_setting(db, "store_name") or "Store"
+    uri = upi_payment_uri(upi_id, store_name, order.total, f"Order {order.order_number}")
+    png_bytes = generate_qr_png_bytes(uri)
+    return Response(content=png_bytes, media_type="image/png")

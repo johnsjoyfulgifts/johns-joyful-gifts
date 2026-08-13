@@ -10,8 +10,8 @@
   <meta property="og:type" content="website">
   <meta name="theme-color" content="#ff6f61">
   <link rel="manifest" href="/static/manifest.json">
-  <link rel="icon" href="/static/icons/favicon.svg">
-  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="icon" href="/static/icons/favicon.png">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/static/css/style.css">
   {% block extra_head %}{% endblock %}
 </head>
@@ -21,7 +21,7 @@
   <header class="site-header">
     <div class="site-header__bar">
       <a class="brand" href="/" aria-label="{{ store.store_name }} home">
-        <span class="brand__logo" aria-hidden="true">JJ</span>
+        <img class="brand__logo" src="/static/icons/logo-icon.png" alt="" width="34" height="34">
         <span>{{ store.store_name }}</span>
       </a>
       <div class="header-search">

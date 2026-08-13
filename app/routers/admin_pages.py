@@ -77,6 +77,43 @@ def logout(request: Request):
     return response
 
 
+@router.get("/change-password")
+def change_password_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    return render_admin(request, "admin/change_password.html", {"active_nav": "change-password"}, db)
+
+
+@router.post("/change-password")
+def change_password_submit(
+    request: Request,
+    current_password: str = Form(...),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(require_admin),
+):
+    error = None
+    if not verify_password(current_password, admin.password_hash):
+        error = "Current password is incorrect."
+    elif len(new_password) < 8:
+        error = "New password must be at least 8 characters."
+    elif new_password != confirm_password:
+        error = "New passwords didn't match."
+
+    if error:
+        return render_admin(
+            request, "admin/change_password.html", {"active_nav": "change-password", "error": error}, db, status_code=400
+        )
+
+    admin.password_hash = hash_password(new_password)
+    db.commit()
+    return render_admin(
+        request,
+        "admin/change_password.html",
+        {"active_nav": "change-password", "success": "Password updated successfully."},
+        db,
+    )
+
+
 # ---------- Dashboard ----------
 
 @router.get("")
@@ -493,6 +530,12 @@ def settings_submit(
     about_text: str = Form(""),
     contact_email: str = Form(""),
     contact_address: str = Form(""),
+    manual_payment_enabled: bool = Form(False),
+    upi_id: str = Form(""),
+    bank_account_name: str = Form(""),
+    bank_account_number: str = Form(""),
+    bank_ifsc: str = Form(""),
+    bank_name: str = Form(""),
     db: Session = Depends(get_db),
     admin: Admin = Depends(require_admin),
 ):
@@ -509,6 +552,12 @@ def settings_submit(
             "about_text": about_text,
             "contact_email": contact_email.strip(),
             "contact_address": contact_address.strip(),
+            "manual_payment_enabled": "true" if manual_payment_enabled else "false",
+            "upi_id": upi_id.strip(),
+            "bank_account_name": bank_account_name.strip(),
+            "bank_account_number": bank_account_number.strip(),
+            "bank_ifsc": bank_ifsc.strip(),
+            "bank_name": bank_name.strip(),
         },
     )
     return RedirectResponse(url="/admin/settings", status_code=303)
@@ -599,6 +648,22 @@ def order_update_status(
                         product.stock += item.quantity
             order.stock_restored = True
 
+        db.commit()
+    return RedirectResponse(url=f"/admin/orders/{order_number}", status_code=303)
+
+
+@router.post("/orders/{order_number}/mark-paid")
+def order_mark_paid(
+    order_number: str,
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(require_admin),
+):
+    """Manual payment methods (UPI/bank transfer) have no automated
+    verification — this is the admin confirming, after checking their own
+    UPI/bank app, that money actually arrived."""
+    order = db.query(Order).filter(Order.order_number == order_number).first()
+    if order is not None:
+        order.payment_status = "Paid"
         db.commit()
     return RedirectResponse(url=f"/admin/orders/{order_number}", status_code=303)
 

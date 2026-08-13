@@ -17,6 +17,30 @@
     <p class="text-muted" style="font-size:0.85rem; margin-top:10px;">Payment: {{ order.payment_method }}</p>
   </div>
 
+  {% if order.payment_method == "UPI / Bank Transfer" %}
+  <div class="card" style="max-width:480px; margin:0 auto 20px; text-align:left;">
+    <h2 style="font-size:1rem; margin-top:0;">Complete Your Payment</h2>
+    {% if upi_id %}
+    <div class="text-center" style="margin:12px 0;">
+      <img src="/order/{{ order.order_number }}/payment-qr.png" alt="Scan to pay via UPI" style="width:180px; height:180px; border:1px solid var(--color-border); border-radius:var(--radius-sm);">
+      <p style="margin-top:8px;"><strong>UPI ID:</strong> <code>{{ upi_id }}</code></p>
+    </div>
+    {% endif %}
+    {% if bank_account_number %}
+    <div style="font-size:0.88rem; margin-top:10px; border-top:1px solid var(--color-border); padding-top:10px;">
+      <p style="margin:2px 0;"><strong>Bank Transfer</strong></p>
+      {% if bank_account_name %}<p style="margin:2px 0;">Account Name: {{ bank_account_name }}</p>{% endif %}
+      <p style="margin:2px 0;">Account Number: {{ bank_account_number }}</p>
+      {% if bank_ifsc %}<p style="margin:2px 0;">IFSC: {{ bank_ifsc }}</p>{% endif %}
+      {% if bank_name %}<p style="margin:2px 0;">Bank: {{ bank_name }}</p>{% endif %}
+    </div>
+    {% endif %}
+    <p class="alert alert--info" style="margin-top:14px;">
+      Please pay ₹{{ "%.0f"|format(order.total) }} using the details above, then send us a payment screenshot on WhatsApp — we'll confirm your order shortly. No need to wait on this page.
+    </p>
+  </div>
+  {% endif %}
+
   <div class="hero__actions">
     <a class="btn btn-whatsapp" href="{{ whatsapp_share_link }}" target="_blank" rel="noopener">💬 Send Order Details on WhatsApp</a>
     <a class="btn btn-secondary" href="/track-order?order_number={{ order.order_number }}">Track This Order</a>

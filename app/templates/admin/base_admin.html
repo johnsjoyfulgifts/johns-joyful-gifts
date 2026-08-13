@@ -5,19 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Admin — {{ store.store_name }}{% endblock %}</title>
   <meta name="robots" content="noindex, nofollow">
-  <link rel="icon" href="/static/icons/favicon.svg">
+  <link rel="icon" href="/static/icons/favicon.png">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body class="admin-body">
   <div class="admin-shell">
     <aside class="admin-sidebar" id="admin-sidebar">
-      <div class="admin-sidebar__brand">🎁 {{ store.store_name }}</div>
+      <div class="admin-sidebar__brand">
+        <img src="/static/icons/logo-icon.png" alt="" width="24" height="24" style="border-radius:50%; vertical-align:middle; margin-right:6px;">
+        {{ store.store_name }}
+      </div>
       <nav aria-label="Admin navigation">
         <a href="/admin" class="{{ 'active' if active_nav == 'dashboard' else '' }}">📊 Dashboard</a>
         <a href="/admin/orders" class="{{ 'active' if active_nav == 'orders' else '' }}">📦 Orders <span id="new-order-badge"></span></a>
         <a href="/admin/products" class="{{ 'active' if active_nav == 'products' else '' }}">🧸 Products</a>
         <a href="/admin/categories" class="{{ 'active' if active_nav == 'categories' else '' }}">🗂️ Categories</a>
         <a href="/admin/settings" class="{{ 'active' if active_nav == 'settings' else '' }}">⚙️ Settings</a>
+        <a href="/admin/change-password" class="{{ 'active' if active_nav == 'change-password' else '' }}">🔑 Change Password</a>
         <a href="/admin/logout">🚪 Log Out</a>
         <a href="/" target="_blank" rel="noopener">🔗 View Store</a>
       </nav>

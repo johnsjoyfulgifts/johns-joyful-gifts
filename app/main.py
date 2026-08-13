@@ -83,8 +83,8 @@ def robots_txt():
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
-    path = os.path.join(BASE_DIR, "static", "icons", "favicon.svg")
-    return FileResponse(path, media_type="image/svg+xml")
+    path = os.path.join(BASE_DIR, "static", "icons", "favicon.png")
+    return FileResponse(path, media_type="image/png")
 
 
 from app.routers import (  # noqa: E402

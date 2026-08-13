@@ -45,7 +45,20 @@
         </div>
 
         <h2 style="font-size:1rem;">Payment Method</h2>
+        {% if manual_payment_available %}
+        <div class="form-group" style="display:flex; flex-direction:column; gap:8px;">
+          <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+            <input type="radio" name="payment_method" value="cod" checked> Cash on Delivery
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+            <input type="radio" name="payment_method" value="manual"> UPI / Bank Transfer
+          </label>
+        </div>
+        <p class="field-hint">Choosing UPI/Bank Transfer shows payment details on the next page — pay directly, no gateway involved.</p>
+        {% else %}
+        <input type="hidden" name="payment_method" value="cod">
         <p class="badge badge--info">Cash on Delivery</p>
+        {% endif %}
 
         <button type="submit" class="btn btn-primary btn-block" id="place-order-btn" style="margin-top:16px;">
           Place Order — ₹{{ "%.0f"|format(total) }}

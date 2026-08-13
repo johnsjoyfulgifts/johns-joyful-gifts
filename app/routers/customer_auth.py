@@ -135,3 +135,44 @@ def account_page(request: Request, db: Session = Depends(get_db), customer: Cust
         .all()
     )
     return render(request, "customer/account.html", {"customer": customer, "orders": orders}, db)
+
+
+@router.get("/account/change-password")
+def change_password_page(request: Request, db: Session = Depends(get_db), customer: Customer = Depends(require_customer)):
+    return render(request, "customer/change_password.html", {"customer": customer}, db)
+
+
+@router.post("/account/change-password")
+def change_password_submit(
+    request: Request,
+    current_password: str = Form(...),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+    db: Session = Depends(get_db),
+    customer: Customer = Depends(require_customer),
+):
+    error = None
+    if not verify_password(current_password, customer.password_hash):
+        error = "Current password is incorrect."
+    elif len(new_password) < 8:
+        error = "New password must be at least 8 characters."
+    elif new_password != confirm_password:
+        error = "New passwords didn't match."
+
+    if error:
+        return render(
+            request,
+            "customer/change_password.html",
+            {"customer": customer, "error": error},
+            db,
+            status_code=400,
+        )
+
+    customer.password_hash = hash_password(new_password)
+    db.commit()
+    return render(
+        request,
+        "customer/change_password.html",
+        {"customer": customer, "success": "Password updated successfully."},
+        db,
+    )

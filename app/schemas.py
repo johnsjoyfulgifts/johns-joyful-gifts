@@ -16,6 +16,7 @@ class CheckoutRequest(BaseModel):
     pincode: str
     delivery_instructions: str | None = None
     idempotency_key: str
+    payment_method: str = "cod"
 
     @field_validator("address", "city", "state")
     @classmethod
@@ -39,6 +40,13 @@ class CheckoutRequest(BaseModel):
         value = value.strip()
         if not (8 <= len(value) <= 80):
             raise ValueError("Invalid request.")
+        return value
+
+    @field_validator("payment_method")
+    @classmethod
+    def valid_payment_method(cls, value: str) -> str:
+        if value not in ("cod", "manual"):
+            raise ValueError("Invalid payment method.")
         return value
 
 

@@ -23,7 +23,26 @@ DEFAULTS: dict[str, str] = {
     "about_text": "We're a small family-run gift shop. Details coming soon.",
     "contact_email": "",
     "contact_address": "",
+    "manual_payment_enabled": "false",
+    "upi_id": "",
+    "bank_account_name": "",
+    "bank_account_number": "",
+    "bank_ifsc": "",
+    "bank_name": "",
 }
+
+
+def manual_payment_available(db: Session) -> bool:
+    """True only when the admin has turned it on AND actually filled in a
+    UPI ID or bank details — mirrors the pattern used for the (since
+    removed) Razorpay toggle, so an empty configuration never shows a
+    broken payment option at checkout."""
+    values = get_all_settings(db)
+    if values.get("manual_payment_enabled") != "true":
+        return False
+    has_upi = bool(values.get("upi_id", "").strip())
+    has_bank = bool(values.get("bank_account_number", "").strip())
+    return has_upi or has_bank
 
 
 def get_all_settings(db: Session) -> dict[str, str]:

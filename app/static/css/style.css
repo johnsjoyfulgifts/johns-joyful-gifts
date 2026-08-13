@@ -65,7 +65,7 @@ button { font-family: inherit; cursor: pointer; }
   padding: 0 16px;
 }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1.15rem; color: var(--color-primary-dark); white-space: nowrap; }
-.brand__logo { width: 34px; height: 34px; border-radius: 50%; background: var(--color-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; }
+.brand__logo { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .header-search { flex: 1; max-width: 420px; }
 .header-search form { display: flex; }
 .header-search input {
