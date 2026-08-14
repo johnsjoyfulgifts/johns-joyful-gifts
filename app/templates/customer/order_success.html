@@ -14,6 +14,9 @@
     <div class="cart-summary-row"><span>{{ item.product_name_snapshot }} × {{ item.quantity }}</span><span>₹{{ "%.0f"|format(item.subtotal) }}</span></div>
     {% endfor %}
     <div class="cart-summary-row"><span>Delivery</span><span>{{ '₹%.0f'|format(order.delivery_charge) if order.delivery_charge else 'FREE' }}</span></div>
+    {% if order.discount_amount %}
+    <div class="cart-summary-row" style="color:var(--color-success);"><span>Coupon ({{ order.coupon_code }})</span><span>−₹{{ "%.0f"|format(order.discount_amount) }}</span></div>
+    {% endif %}
     <div class="cart-summary-row cart-summary-row--total"><span>Total</span><span>₹{{ "%.0f"|format(order.total) }}</span></div>
     <p class="text-muted" style="font-size:0.85rem; margin-top:10px;">Payment: {{ order.payment_method }}</p>
     {% if order.gift_wrap or order.gift_message %}

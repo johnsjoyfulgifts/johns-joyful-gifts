@@ -56,6 +56,15 @@
           <textarea class="form-control" id="gift_message" name="gift_message" rows="2" maxlength="300" placeholder="Write a short note for the recipient..."></textarea>
         </div>
 
+        <h2 style="font-size:1rem;">Coupon Code (optional)</h2>
+        <div class="form-group">
+          <div class="flex gap-8">
+            <input class="form-control" id="coupon_code" name="coupon_code" placeholder="Enter coupon code" style="text-transform:uppercase;">
+            <button type="button" class="btn btn-secondary" id="apply-coupon-btn">Apply</button>
+          </div>
+          <p id="coupon-feedback" class="field-hint"></p>
+        </div>
+
         <h2 style="font-size:1rem;">Payment Method</h2>
         {% if manual_payment_available %}
         <div class="form-group" style="display:flex; flex-direction:column; gap:8px;">
@@ -83,9 +92,10 @@
       {% for line in lines %}
       <div class="cart-summary-row"><span>{{ line.product.name }} × {{ line.quantity }}</span><span>₹{{ "%.0f"|format(line.subtotal) }}</span></div>
       {% endfor %}
-      <div class="cart-summary-row"><span>Subtotal</span><span>₹{{ "%.0f"|format(subtotal) }}</span></div>
+      <div class="cart-summary-row"><span>Subtotal</span><span id="summary-subtotal">₹{{ "%.0f"|format(subtotal) }}</span></div>
       <div class="cart-summary-row"><span>Delivery</span><span>{{ '₹%.0f'|format(delivery_charge) if delivery_charge else 'FREE' }}</span></div>
-      <div class="cart-summary-row cart-summary-row--total"><span>Total</span><span>₹{{ "%.0f"|format(total) }}</span></div>
+      <div class="cart-summary-row" id="summary-discount-row" style="display:none; color:var(--color-success);"><span>Coupon Discount</span><span id="summary-discount">−₹0</span></div>
+      <div class="cart-summary-row cart-summary-row--total"><span>Total</span><span id="summary-total">₹{{ "%.0f"|format(total) }}</span></div>
     </div>
   </div>
   <style>@media (min-width: 780px) { .checkout-layout { grid-template-columns: 2fr 1fr; align-items: start; } }</style>
@@ -100,6 +110,58 @@
   if (!form) return;
   var btn = document.getElementById('place-order-btn');
   var alertBox = document.getElementById('checkout-alert');
+  var baseSubtotal = {{ subtotal }};
+  var baseDeliveryCharge = {{ delivery_charge }};
+  var currentDiscount = 0;
+
+  function renderTotals(discountAmount) {
+    currentDiscount = discountAmount;
+    var total = Math.max(0, baseSubtotal + baseDeliveryCharge - discountAmount);
+    var discountRow = document.getElementById('summary-discount-row');
+    if (discountAmount > 0) {
+      discountRow.style.display = '';
+      document.getElementById('summary-discount').textContent = '−₹' + discountAmount.toFixed(0);
+    } else {
+      discountRow.style.display = 'none';
+    }
+    document.getElementById('summary-total').textContent = '₹' + total.toFixed(0);
+    btn.textContent = 'Place Order — ₹' + total.toFixed(0);
+  }
+
+  var applyCouponBtn = document.getElementById('apply-coupon-btn');
+  var couponInput = document.getElementById('coupon_code');
+  var couponFeedback = document.getElementById('coupon-feedback');
+  if (applyCouponBtn) {
+    applyCouponBtn.addEventListener('click', async function () {
+      var code = couponInput.value.trim();
+      if (!code) return;
+      applyCouponBtn.disabled = true;
+      couponFeedback.textContent = 'Checking...';
+      couponFeedback.style.color = 'var(--color-text-muted)';
+      try {
+        var res = await fetch('/api/coupon/validate', {
+          method: 'POST',
+          body: new URLSearchParams({ code: code }),
+          headers: { Accept: 'application/json' },
+        });
+        var body = await res.json();
+        if (!res.ok || !body.valid) {
+          couponFeedback.textContent = body.detail || 'This coupon isn\'t valid.';
+          couponFeedback.style.color = 'var(--color-danger)';
+          renderTotals(0);
+          return;
+        }
+        couponFeedback.textContent = 'Coupon applied — you saved ₹' + body.discount_amount.toFixed(0) + '!';
+        couponFeedback.style.color = 'var(--color-success)';
+        renderTotals(body.discount_amount);
+      } catch (err) {
+        couponFeedback.textContent = 'Could not check this coupon right now.';
+        couponFeedback.style.color = 'var(--color-danger)';
+      } finally {
+        applyCouponBtn.disabled = false;
+      }
+    });
+  }
 
   // One idempotency key per checkout attempt on this cart. It's only
   // regenerated after a successful order, so double-clicks, refreshes, or
@@ -120,7 +182,7 @@
 
   function resetButton() {
     btn.disabled = false;
-    btn.textContent = 'Place Order';
+    renderTotals(currentDiscount);
   }
 
   form.addEventListener('submit', async function (event) {

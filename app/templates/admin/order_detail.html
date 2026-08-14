@@ -12,6 +12,9 @@
       {% endfor %}
       <div class="cart-summary-row"><span>Subtotal</span><span>₹{{ "%.0f"|format(order.subtotal) }}</span></div>
       <div class="cart-summary-row"><span>Delivery</span><span>{{ '₹%.0f'|format(order.delivery_charge) if order.delivery_charge else 'FREE' }}</span></div>
+      {% if order.discount_amount %}
+      <div class="cart-summary-row" style="color:var(--color-success);"><span>Coupon ({{ order.coupon_code }})</span><span>−₹{{ "%.0f"|format(order.discount_amount) }}</span></div>
+      {% endif %}
       <div class="cart-summary-row cart-summary-row--total"><span>Total</span><span>₹{{ "%.0f"|format(order.total) }}</span></div>
       <div class="flex items-center gap-8" style="margin-top:8px; flex-wrap:wrap;">
         <p class="text-muted" style="font-size:0.85rem; margin:0;">Payment: {{ order.payment_method }} ({{ order.payment_status }})</p>

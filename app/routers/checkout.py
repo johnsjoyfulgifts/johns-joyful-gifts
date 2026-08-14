@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, Request
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
@@ -7,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.cart_service import cart_totals, clear_cart, get_cart_lines, read_cart
 from app.customer_auth import require_customer, require_customer_api
 from app.database import get_db
-from app.models import Customer, Order, OrderItem, OrderStatus, OrderStatusHistory, Product
+from app.models import Coupon, Customer, Order, OrderItem, OrderStatus, OrderStatusHistory, Product
 from app.qr import generate_qr_png_bytes, upi_payment_uri
 from app.schemas import CheckoutRequest
 from app.settings_service import compute_delivery_charge, get_all_settings, get_setting, manual_payment_available
@@ -22,6 +24,37 @@ MANUAL_PAYMENT_METHOD_LABEL = "UPI / Bank Transfer"
 
 class _StockProblem(Exception):
     pass
+
+
+class _CouponProblem(Exception):
+    pass
+
+
+def _validate_and_price_coupon(db: Session, code: str, subtotal: float, lock: bool) -> tuple[Coupon, float]:
+    """Shared by the live checkout-page preview (lock=False, read-only) and
+    the actual order-creation transaction (lock=True, inside the same
+    row-locked section as inventory safety — see api_checkout). Locking the
+    coupon row itself is what stops two customers from both winning the last
+    use of a limited-use code."""
+    query = db.query(Coupon).filter(Coupon.code == code)
+    if lock:
+        query = query.with_for_update()
+    coupon = query.first()
+    if coupon is None or not coupon.active:
+        raise _CouponProblem("Invalid coupon code.")
+    if coupon.expires_at and coupon.expires_at < datetime.now(timezone.utc):
+        raise _CouponProblem("This coupon has expired.")
+    if coupon.usage_limit is not None and coupon.used_count >= coupon.usage_limit:
+        raise _CouponProblem("This coupon has reached its usage limit.")
+    if subtotal < coupon.min_order_value:
+        raise _CouponProblem(f"This coupon needs a minimum order of ₹{coupon.min_order_value:.0f}.")
+
+    if coupon.discount_type == "percent":
+        discount = subtotal * coupon.discount_value / 100
+    else:
+        discount = coupon.discount_value
+    discount = round(min(discount, subtotal), 2)
+    return coupon, discount
 
 
 @router.get("/checkout")
@@ -49,6 +82,22 @@ def _order_number_response(order: Order) -> JSONResponse:
     response = JSONResponse({"order_number": order.order_number})
     clear_cart(response)
     return response
+
+
+@router.post("/api/coupon/validate")
+def validate_coupon(
+    request: Request,
+    code: str = Form(...),
+    db: Session = Depends(get_db),
+    customer: Customer = Depends(require_customer_api),
+):
+    lines = get_cart_lines(request, db)
+    subtotal, _ = cart_totals(lines)
+    try:
+        coupon, discount_amount = _validate_and_price_coupon(db, code.strip().upper(), subtotal, lock=False)
+    except _CouponProblem as exc:
+        return JSONResponse({"valid": False, "detail": str(exc)}, status_code=400)
+    return JSONResponse({"valid": True, "code": coupon.code, "discount_amount": discount_amount})
 
 
 @router.post("/api/checkout")
@@ -125,7 +174,15 @@ async def api_checkout(
 
         subtotal = round(sum(product.price * qty for product, qty in order_items_data), 2)
         delivery_charge = compute_delivery_charge(db, subtotal)
-        total = round(subtotal + delivery_charge, 2)
+
+        discount_amount = 0.0
+        applied_coupon_code = None
+        if checkout_data.coupon_code:
+            coupon, discount_amount = _validate_and_price_coupon(db, checkout_data.coupon_code, subtotal, lock=True)
+            coupon.used_count += 1
+            applied_coupon_code = coupon.code
+
+        total = round(subtotal + delivery_charge - discount_amount, 2)
 
         order = Order(
             order_number=generate_order_number(db),
@@ -138,6 +195,8 @@ async def api_checkout(
             delivery_pincode=checkout_data.pincode,
             subtotal=subtotal,
             delivery_charge=delivery_charge,
+            coupon_code=applied_coupon_code,
+            discount_amount=discount_amount,
             total=total,
             payment_method=MANUAL_PAYMENT_METHOD_LABEL if checkout_data.payment_method == "manual" else "Cash on Delivery",
             payment_status="Pending",
@@ -179,6 +238,9 @@ async def api_checkout(
     except _StockProblem as exc:
         db.rollback()
         return JSONResponse({"detail": str(exc), "stock_issue": True}, status_code=409)
+    except _CouponProblem as exc:
+        db.rollback()
+        return JSONResponse({"detail": str(exc), "coupon_issue": True}, status_code=400)
     except IntegrityError:
         # Two truly concurrent submits with the same idempotency key: the
         # loser's INSERT hits the UNIQUE constraint. Not an error for the

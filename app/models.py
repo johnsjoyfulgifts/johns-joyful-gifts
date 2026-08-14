@@ -159,6 +159,8 @@ class Order(Base):
     delivery_pincode: Mapped[str] = mapped_column(String(12))
     subtotal: Mapped[float] = mapped_column(Float)
     delivery_charge: Mapped[float] = mapped_column(Float, default=0)
+    coupon_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    discount_amount: Mapped[float] = mapped_column(Float, default=0)
     total: Mapped[float] = mapped_column(Float)
     payment_method: Mapped[str] = mapped_column(String(40), default="Cash on Delivery")
     payment_status: Mapped[str] = mapped_column(String(20), default=PaymentStatus.PENDING.value)
@@ -206,6 +208,24 @@ class OrderStatusHistory(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     order: Mapped["Order"] = relationship(back_populates="status_history")
+
+
+class Coupon(Base):
+    __tablename__ = "coupons"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    discount_type: Mapped[str] = mapped_column(String(10), default="flat")  # "flat" | "percent"
+    discount_value: Mapped[float] = mapped_column(Float)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    min_order_value: Mapped[float] = mapped_column(Float, default=0)
+    # None = unlimited uses. used_count is only ever incremented inside the
+    # same row-locked transaction as order creation (see checkout.py), so two
+    # customers racing for the last use of a limited coupon can't both win.
+    usage_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    used_count: Mapped[int] = mapped_column(Integer, default=0)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
 
 class Wishlist(Base):

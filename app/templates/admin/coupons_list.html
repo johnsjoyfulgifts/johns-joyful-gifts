@@ -1,0 +1,54 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Coupons — Admin{% endblock %}
+{% block page_title %}Coupons{% endblock %}
+
+{% block admin_content %}
+<div class="flex justify-between items-center" style="margin-bottom:14px;">
+  <span class="text-muted">{{ coupons|length }} coupons</span>
+  <a class="btn btn-primary btn-sm" href="/admin/coupons/new">+ Add Coupon</a>
+</div>
+
+{% if coupons %}
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead><tr><th>Code</th><th>Discount</th><th>Min Order</th><th>Usage</th><th>Expires</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for c in coupons %}
+      <tr>
+        <td><strong>{{ c.code }}</strong></td>
+        <td>{{ '%.0f'|format(c.discount_value) + '%' if c.discount_type == 'percent' else '₹' + '%.0f'|format(c.discount_value) }}</td>
+        <td>{{ '₹%.0f'|format(c.min_order_value) if c.min_order_value else '—' }}</td>
+        <td>{{ c.used_count }}{{ ' / ' + c.usage_limit|string if c.usage_limit else '' }}</td>
+        <td>{{ c.expires_at.strftime('%d %b %Y') if c.expires_at else '—' }}</td>
+        <td>{% if c.active %}<span class="badge badge--success">Active</span>{% else %}<span class="badge badge--muted">Inactive</span>{% endif %}</td>
+        <td>
+          <a class="btn btn-sm btn-secondary" href="/admin/coupons/{{ c.id }}/edit">Edit</a>
+          <form method="post" action="/admin/coupons/{{ c.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this coupon? Past orders that used it keep their discount on record.');">
+            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div class="admin-card-list">
+  {% for c in coupons %}
+  <div class="admin-record-card">
+    <div class="admin-record-card__row"><span>Code</span><span><strong>{{ c.code }}</strong></span></div>
+    <div class="admin-record-card__row"><span>Discount</span><span>{{ '%.0f'|format(c.discount_value) + '%' if c.discount_type == 'percent' else '₹' + '%.0f'|format(c.discount_value) }}</span></div>
+    <div class="admin-record-card__row"><span>Usage</span><span>{{ c.used_count }}{{ ' / ' + c.usage_limit|string if c.usage_limit else '' }}</span></div>
+    <div class="admin-record-card__row"><span>Status</span><span>{% if c.active %}<span class="badge badge--success">Active</span>{% else %}<span class="badge badge--muted">Inactive</span>{% endif %}</span></div>
+    <div class="flex gap-8" style="margin-top:10px;">
+      <a class="btn btn-sm btn-secondary" href="/admin/coupons/{{ c.id }}/edit">Edit</a>
+      <form method="post" action="/admin/coupons/{{ c.id }}/delete" onsubmit="return confirm('Delete this coupon?');">
+        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state"><h3>No coupons yet.</h3><p>Create a code like WELCOME10 to offer a discount.</p></div>
+{% endif %}
+{% endblock %}

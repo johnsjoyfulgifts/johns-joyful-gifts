@@ -19,6 +19,7 @@ class CheckoutRequest(BaseModel):
     payment_method: str = "cod"
     gift_wrap: bool = False
     gift_message: str | None = None
+    coupon_code: str | None = None
 
     @field_validator("address", "city", "state")
     @classmethod
@@ -60,6 +61,13 @@ class CheckoutRequest(BaseModel):
         if len(value) > 300:
             raise ValueError("Gift message must be 300 characters or fewer.")
         return value or None
+
+    @field_validator("coupon_code")
+    @classmethod
+    def normalize_coupon_code(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip().upper() or None
 
 
 class RegisterRequest(BaseModel):

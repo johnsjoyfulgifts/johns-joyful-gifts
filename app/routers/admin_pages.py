@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, Form, Request, UploadFile
 from fastapi import File as FastAPIFile
 from fastapi.responses import RedirectResponse
@@ -17,6 +19,7 @@ from app.rate_limit import is_rate_limited
 from app.models import (
     Admin,
     Category,
+    Coupon,
     Customer,
     Order,
     OrderStatus,
@@ -586,6 +589,133 @@ def settings_submit(
         },
     )
     return RedirectResponse(url="/admin/settings", status_code=303)
+
+
+# ---------- Coupons ----------
+
+def _parse_expiry_date(value: str) -> datetime | None:
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc, hour=23, minute=59, second=59)
+    except ValueError:
+        return None
+
+
+def _coupon_form_context(coupon=None, error=None) -> dict:
+    return {"active_nav": "coupons", "coupon": coupon, "error": error}
+
+
+@router.get("/coupons")
+def coupons_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    coupons = db.query(Coupon).order_by(Coupon.created_at.desc()).all()
+    return render_admin(request, "admin/coupons_list.html", {"active_nav": "coupons", "coupons": coupons}, db)
+
+
+@router.get("/coupons/new")
+def coupon_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    return render_admin(request, "admin/coupon_form.html", _coupon_form_context(), db)
+
+
+def _validate_coupon_form(db: Session, code: str, discount_type: str, discount_value: float, exclude_id: int | None) -> str | None:
+    if not code:
+        return "Coupon code is required."
+    if discount_type not in ("flat", "percent"):
+        return "Invalid discount type."
+    if discount_value <= 0:
+        return "Discount value must be greater than 0."
+    if discount_type == "percent" and discount_value > 100:
+        return "Percentage discount cannot exceed 100."
+    query = db.query(Coupon).filter(Coupon.code == code)
+    if exclude_id is not None:
+        query = query.filter(Coupon.id != exclude_id)
+    if query.first() is not None:
+        return "A coupon with this code already exists."
+    return None
+
+
+@router.post("/coupons/new")
+def coupon_new_submit(
+    request: Request,
+    code: str = Form(...),
+    discount_type: str = Form("flat"),
+    discount_value: float = Form(...),
+    min_order_value: float = Form(0),
+    usage_limit: str = Form(""),
+    expires_at: str = Form(""),
+    active: bool = Form(True),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(require_admin),
+):
+    code = code.strip().upper()
+    error = _validate_coupon_form(db, code, discount_type, discount_value, exclude_id=None)
+    if error:
+        return render_admin(request, "admin/coupon_form.html", _coupon_form_context(error=error), db, status_code=400)
+
+    coupon = Coupon(
+        code=code,
+        discount_type=discount_type,
+        discount_value=discount_value,
+        min_order_value=min_order_value or 0,
+        usage_limit=int(usage_limit) if usage_limit.strip() else None,
+        expires_at=_parse_expiry_date(expires_at),
+        active=active,
+    )
+    db.add(coupon)
+    db.commit()
+    return RedirectResponse(url="/admin/coupons", status_code=303)
+
+
+@router.get("/coupons/{coupon_id}/edit")
+def coupon_edit_page(coupon_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    coupon = db.get(Coupon, coupon_id)
+    if coupon is None:
+        return RedirectResponse(url="/admin/coupons", status_code=303)
+    return render_admin(request, "admin/coupon_form.html", _coupon_form_context(coupon=coupon), db)
+
+
+@router.post("/coupons/{coupon_id}/edit")
+def coupon_edit_submit(
+    coupon_id: int,
+    request: Request,
+    code: str = Form(...),
+    discount_type: str = Form("flat"),
+    discount_value: float = Form(...),
+    min_order_value: float = Form(0),
+    usage_limit: str = Form(""),
+    expires_at: str = Form(""),
+    active: bool = Form(True),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(require_admin),
+):
+    coupon = db.get(Coupon, coupon_id)
+    if coupon is None:
+        return RedirectResponse(url="/admin/coupons", status_code=303)
+
+    code = code.strip().upper()
+    error = _validate_coupon_form(db, code, discount_type, discount_value, exclude_id=coupon_id)
+    if error:
+        return render_admin(request, "admin/coupon_form.html", _coupon_form_context(coupon=coupon, error=error), db, status_code=400)
+
+    coupon.code = code
+    coupon.discount_type = discount_type
+    coupon.discount_value = discount_value
+    coupon.min_order_value = min_order_value or 0
+    coupon.usage_limit = int(usage_limit) if usage_limit.strip() else None
+    coupon.expires_at = _parse_expiry_date(expires_at)
+    coupon.active = active
+    db.commit()
+    return RedirectResponse(url="/admin/coupons", status_code=303)
+
+
+@router.post("/coupons/{coupon_id}/delete")
+def coupon_delete(coupon_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    coupon = db.get(Coupon, coupon_id)
+    if coupon is not None:
+        db.delete(coupon)
+        db.commit()
+    return RedirectResponse(url="/admin/coupons", status_code=303)
 
 
 # ---------- Orders ----------
