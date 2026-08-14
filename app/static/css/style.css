@@ -207,7 +207,7 @@ main { flex: 1; }
 
 /* Trust section */
 .trust-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
-@media (min-width: 640px) { .trust-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 640px) { .trust-grid { grid-template-columns: repeat(3, 1fr); } }
 .trust-item { background: var(--color-surface); border-radius: var(--radius-md); padding: 16px; text-align: center; border: 1px solid var(--color-border); }
 .trust-item__icon { font-size: 1.6rem; margin-bottom: 6px; }
 .trust-item__title { font-weight: 700; font-size: 0.85rem; }
