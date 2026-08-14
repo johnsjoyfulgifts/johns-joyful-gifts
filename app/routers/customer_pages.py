@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from app.customer_auth import get_current_customer
 from app.database import get_db
-from app.models import Category, Product
+from app.models import Category, Product, Review
 from app.product_query import apply_filters, apply_sort, base_active_query, paginate
 from app.settings_service import get_all_settings
 from app.templating import render
@@ -37,6 +39,14 @@ def home(request: Request, db: Session = Depends(get_db)):
         .limit(10)
         .all()
     )
+    special_offers = (
+        base_active_query(db)
+        .options(joinedload(Product.images))
+        .filter(Product.original_price.isnot(None), Product.original_price > Product.price)
+        .order_by(Product.created_at.desc())
+        .limit(10)
+        .all()
+    )
     categories = db.query(Category).filter(Category.active.is_(True)).order_by(Category.sort_order, Category.name).all()
 
     has_any_products = base_active_query(db).count() > 0
@@ -48,6 +58,7 @@ def home(request: Request, db: Session = Depends(get_db)):
             "featured": featured,
             "new_arrivals": new_arrivals,
             "bestsellers": bestsellers,
+            "special_offers": special_offers,
             "categories": categories,
             "has_any_products": has_any_products,
         },
@@ -58,6 +69,7 @@ def home(request: Request, db: Session = Depends(get_db)):
 @router.get("/shop")
 def shop(
     request: Request,
+    q: str = "",
     category: str | None = None,
     min_price: float | None = None,
     max_price: float | None = None,
@@ -73,7 +85,14 @@ def shop(
         category_id = category_obj.id if category_obj else -1  # -1 -> no results, not an error
 
     query = base_active_query(db).options(joinedload(Product.images))
-    query = apply_filters(query, category_id=category_id, min_price=min_price, max_price=max_price, in_stock_only=in_stock)
+    query = apply_filters(
+        query,
+        category_id=category_id,
+        min_price=min_price,
+        max_price=max_price,
+        in_stock_only=in_stock,
+        search=q or None,
+    )
     query = apply_sort(query, sort)
     items, total, total_pages, page = paginate(query, page)
 
@@ -90,12 +109,14 @@ def shop(
             "categories": categories,
             "current_category": category_obj,
             "filters": {
+                "q": q or "",
                 "category": category or "",
                 "min_price": min_price,
                 "max_price": max_price,
                 "in_stock": in_stock,
                 "sort": sort or "",
             },
+            "has_active_filters": bool(q or category or min_price or max_price or in_stock or sort),
             "page_title": category_obj.name if category_obj else "All Products",
         },
         db,
@@ -119,7 +140,8 @@ def category_page(slug: str, request: Request, page: int = 1, sort: str | None =
                 "page": page,
                 "categories": categories,
                 "current_category": None,
-                "filters": {"category": slug, "min_price": None, "max_price": None, "in_stock": False, "sort": ""},
+                "filters": {"q": "", "category": slug, "min_price": None, "max_price": None, "in_stock": False, "sort": ""},
+                "has_active_filters": False,
                 "page_title": "Category Not Found",
             },
             db,
@@ -141,7 +163,8 @@ def category_page(slug: str, request: Request, page: int = 1, sort: str | None =
             "page": page,
             "categories": categories,
             "current_category": category_obj,
-            "filters": {"category": slug, "min_price": None, "max_price": None, "in_stock": False, "sort": sort or ""},
+            "filters": {"q": "", "category": slug, "min_price": None, "max_price": None, "in_stock": False, "sort": sort or ""},
+            "has_active_filters": bool(sort),
             "page_title": category_obj.name,
         },
         db,
@@ -191,10 +214,38 @@ def product_detail(slug: str, request: Request, db: Session = Depends(get_db)):
     whatsapp_number = get_all_settings(db).get("whatsapp_number", "")
     product_whatsapp_link = whatsapp_chat_link(whatsapp_number, product_enquiry_message(product))
 
+    approved_reviews = (
+        db.query(Review)
+        .options(joinedload(Review.customer))
+        .filter(Review.product_id == product.id, Review.approved.is_(True))
+        .order_by(Review.created_at.desc())
+        .all()
+    )
+    review_count = len(approved_reviews)
+    average_rating = round(sum(r.rating for r in approved_reviews) / review_count, 1) if review_count else 0
+
+    current_customer = get_current_customer(request, db)
+    my_review = None
+    if current_customer is not None:
+        my_review = (
+            db.query(Review)
+            .filter(Review.product_id == product.id, Review.customer_id == current_customer.id)
+            .first()
+        )
+
     return render(
         request,
         "customer/product_detail.html",
-        {"product": product, "related": related, "product_whatsapp_link": product_whatsapp_link},
+        {
+            "product": product,
+            "related": related,
+            "product_whatsapp_link": product_whatsapp_link,
+            "approved_reviews": approved_reviews,
+            "review_count": review_count,
+            "average_rating": average_rating,
+            "my_review": my_review,
+            "review_submitted": request.query_params.get("review") == "submitted",
+        },
         db,
     )
 

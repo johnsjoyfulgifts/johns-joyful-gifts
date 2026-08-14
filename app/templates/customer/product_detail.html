@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "customer/_product_card.html" as cards %}
 {% import "_whatsapp_icon.html" as wa %}
+{% import "_stars.html" as stars_macro %}
 {% block title %}{{ product.name }} — {{ store.store_name }}{% endblock %}
 {% block meta_description %}{{ product.short_description or product.name }}{% endblock %}
 
@@ -58,6 +59,13 @@
       <h1 style="margin:0 0 8px; font-size:1.5rem;">{{ product.name }}</h1>
       {% if product.short_description %}<p class="text-muted">{{ product.short_description }}</p>{% endif %}
 
+      {% if review_count %}
+      <div class="flex items-center gap-8" style="margin:4px 0;">
+        <span style="color:var(--color-accent);">{{ stars_macro.stars(average_rating|round(0, 'floor')|int) }}</span>
+        <a href="#reviews" class="text-muted" style="font-size:0.85rem;">{{ average_rating }} ({{ review_count }} review{{ 's' if review_count != 1 }})</a>
+      </div>
+      {% endif %}
+
       <div class="product-card__price" style="font-size:1.3rem; margin:12px 0;">
         <span class="price">₹{{ "%.0f"|format(product.price) }}</span>
         {% if product.original_price and product.original_price > product.price %}
@@ -66,10 +74,12 @@
         {% endif %}
       </div>
 
-      {% if product.in_stock %}
-        <p class="badge badge--success">In Stock{% if product.stock <= 5 %} — only {{ product.stock }} left{% endif %}</p>
-      {% else %}
+      {% if not product.in_stock %}
         <p class="badge badge--danger">Out of Stock</p>
+      {% elif product.stock <= 5 %}
+        <p class="badge badge--warning">Low Stock — only {{ product.stock }} left</p>
+      {% else %}
+        <p class="badge badge--success">In Stock</p>
       {% endif %}
 
       <a class="btn btn-whatsapp btn-block" href="{{ product_whatsapp_link }}" target="_blank" rel="noopener" style="margin-bottom:10px;">
@@ -115,6 +125,65 @@
       {% endif %}
     </div>
   </div>
+
+  <section class="page-section" id="reviews">
+    <h2 class="section-title">Customer Reviews</h2>
+
+    {% if review_count %}
+    <div class="flex items-center gap-12" style="margin-bottom:18px;">
+      <span style="font-size:1.8rem; font-weight:800;">{{ average_rating }}</span>
+      <div>
+        <div style="color:var(--color-accent);">{{ stars_macro.stars(average_rating|round(0, 'floor')|int) }}</div>
+        <div class="text-muted" style="font-size:0.85rem;">Based on {{ review_count }} review{{ 's' if review_count != 1 }}</div>
+      </div>
+    </div>
+    {% else %}
+    <p class="text-muted">No reviews yet — be the first to share your thoughts!</p>
+    {% endif %}
+
+    {% if review_submitted %}
+    <div class="alert alert--success">Thanks for your review! It'll appear here once approved.</div>
+    {% endif %}
+
+    {% if current_customer %}
+    <div class="card" style="max-width:480px; margin-bottom:20px;">
+      <h3 style="font-size:0.95rem; margin-top:0;">{{ 'Edit Your Review' if my_review else 'Write a Review' }}</h3>
+      <form method="post" action="/product/{{ product.slug }}/review">
+        <div class="form-group">
+          <label for="rating">Rating *</label>
+          <select class="form-control" id="rating" name="rating" required>
+            {% for i in range(5, 0, -1) %}
+            <option value="{{ i }}" {{ 'selected' if (my_review and my_review.rating == i) or (not my_review and i == 5) }}>{{ i }} Star{{ 's' if i != 1 }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="review_text">Your Review (optional)</label>
+          <textarea class="form-control" id="review_text" name="review_text" rows="3" maxlength="1000">{{ my_review.review_text if my_review else '' }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">{{ 'Update Review' if my_review else 'Submit Review' }}</button>
+        {% if my_review and not my_review.approved %}<p class="field-hint">Your review is awaiting approval.</p>{% endif %}
+      </form>
+    </div>
+    {% else %}
+    <p class="text-muted" style="margin-bottom:20px;"><a href="/login?next=/product/{{ product.slug }}">Log in</a> to write a review.</p>
+    {% endif %}
+
+    {% if approved_reviews %}
+    <div style="display:flex; flex-direction:column; gap:14px;">
+      {% for r in approved_reviews %}
+      <div class="card">
+        <div class="flex justify-between items-center">
+          <strong>{{ r.customer.name }}</strong>
+          <span class="text-muted" style="font-size:0.78rem;">{{ r.created_at.strftime('%d %b %Y') }}</span>
+        </div>
+        <div style="color:var(--color-accent); margin:4px 0;">{{ stars_macro.stars(r.rating) }}</div>
+        {% if r.review_text %}<p style="margin:0;">{{ r.review_text }}</p>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
 
   {% if related %}
   <section class="page-section">

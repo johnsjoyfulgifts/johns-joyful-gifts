@@ -26,6 +26,7 @@ from app.models import (
     OrderStatusHistory,
     Product,
     ProductImage,
+    Review,
 )
 from app.settings_service import DEFAULTS, get_all_settings, set_settings
 from app.storage import UploadValidationError, delete_product_image, save_product_image
@@ -127,9 +128,22 @@ def dashboard(request: Request, db: Session = Depends(get_db), admin: Admin = De
     total_orders = sum(counts_by_status.values())
     total_sales = db.query(func.coalesce(func.sum(Order.total), 0)).filter(Order.order_status != OrderStatus.CANCELLED.value).scalar()
     low_stock = db.query(Product).filter(Product.active.is_(True), Product.stock <= 5, Product.stock > 0).order_by(Product.stock).limit(8).all()
+    low_stock_count = db.query(Product).filter(Product.active.is_(True), Product.stock <= 5, Product.stock > 0).count()
     out_of_stock_count = db.query(Product).filter(Product.active.is_(True), Product.stock <= 0).count()
     new_order_count = db.query(Order).filter(Order.viewed_by_admin.is_(False)).count()
     recent_orders = db.query(Order).options(joinedload(Order.customer)).order_by(Order.created_at.desc()).limit(10).all()
+
+    total_products = db.query(Product).count()
+    active_products = db.query(Product).filter(Product.active.is_(True)).count()
+    featured_count = db.query(Product).filter(Product.active.is_(True), Product.featured.is_(True)).count()
+    new_arrival_count = db.query(Product).filter(Product.active.is_(True), Product.new_arrival.is_(True)).count()
+    sale_count = (
+        db.query(Product)
+        .filter(Product.active.is_(True), Product.original_price.isnot(None), Product.original_price > Product.price)
+        .count()
+    )
+    pending_review_count = db.query(Review).filter(Review.approved.is_(False)).count()
+    recent_products = db.query(Product).order_by(Product.created_at.desc()).limit(5).all()
 
     return render_admin(
         request,
@@ -144,8 +158,16 @@ def dashboard(request: Request, db: Session = Depends(get_db), admin: Admin = De
             "cancelled_count": counts_by_status.get(OrderStatus.CANCELLED.value, 0),
             "total_sales": total_sales,
             "low_stock": low_stock,
+            "low_stock_count": low_stock_count,
             "out_of_stock_count": out_of_stock_count,
             "recent_orders": recent_orders,
+            "total_products": total_products,
+            "active_products": active_products,
+            "featured_count": featured_count,
+            "new_arrival_count": new_arrival_count,
+            "sale_count": sale_count,
+            "pending_review_count": pending_review_count,
+            "recent_products": recent_products,
         },
         db,
     )
@@ -716,6 +738,57 @@ def coupon_delete(coupon_id: int, db: Session = Depends(get_db), admin: Admin = 
         db.delete(coupon)
         db.commit()
     return RedirectResponse(url="/admin/coupons", status_code=303)
+
+
+# ---------- Reviews ----------
+
+@router.get("/reviews")
+def reviews_list(
+    request: Request,
+    status: str = "",
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(require_admin),
+):
+    query = db.query(Review).options(joinedload(Review.product), joinedload(Review.customer))
+    if status == "pending":
+        query = query.filter(Review.approved.is_(False))
+    elif status == "approved":
+        query = query.filter(Review.approved.is_(True))
+    reviews = query.order_by(Review.created_at.desc()).all()
+    pending_count = db.query(Review).filter(Review.approved.is_(False)).count()
+    return render_admin(
+        request,
+        "admin/reviews_list.html",
+        {"active_nav": "reviews", "reviews": reviews, "status": status, "pending_count": pending_count},
+        db,
+    )
+
+
+@router.post("/reviews/{review_id}/approve")
+def review_approve(review_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    review = db.get(Review, review_id)
+    if review is not None:
+        review.approved = True
+        db.commit()
+    return RedirectResponse(url="/admin/reviews", status_code=303)
+
+
+@router.post("/reviews/{review_id}/hide")
+def review_hide(review_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    review = db.get(Review, review_id)
+    if review is not None:
+        review.approved = False
+        db.commit()
+    return RedirectResponse(url="/admin/reviews", status_code=303)
+
+
+@router.post("/reviews/{review_id}/delete")
+def review_delete(review_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    review = db.get(Review, review_id)
+    if review is not None:
+        db.delete(review)
+        db.commit()
+    return RedirectResponse(url="/admin/reviews", status_code=303)
 
 
 # ---------- Orders ----------

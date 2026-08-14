@@ -27,7 +27,7 @@ async def no_cache_static_assets(request: Request, call_next):
     forces revalidation via ETag on every request; unchanged files still get
     a cheap 304, so this costs nothing but guarantees freshness."""
     response = await call_next(request)
-    if request.url.path.startswith("/static/"):
+    if request.url.path.startswith("/static/") or request.url.path == "/sw.js":
         response.headers["Cache-Control"] = "no-cache"
     return response
 
@@ -95,6 +95,15 @@ def robots_txt():
     return PlainTextResponse("User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: /sitemap.xml\n")
 
 
+@app.get("/sw.js", include_in_schema=False)
+def service_worker():
+    # Served from the root (not /static/sw.js) so its default scope is the
+    # whole site, not just /static/ — needed for the offline fallback to
+    # apply to ordinary page navigations.
+    path = os.path.join(BASE_DIR, "static", "sw.js")
+    return FileResponse(path, media_type="application/javascript")
+
+
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
     path = os.path.join(BASE_DIR, "static", "icons", "favicon.png")
@@ -108,6 +117,7 @@ from app.routers import (  # noqa: E402
     checkout,
     customer_auth,
     customer_pages,
+    reviews,
     tracking,
     wishlist,
 )
@@ -118,5 +128,6 @@ app.include_router(cart.router)
 app.include_router(checkout.router)
 app.include_router(tracking.router)
 app.include_router(wishlist.router)
+app.include_router(reviews.router)
 app.include_router(admin_pages.router)
 app.include_router(admin_api.router)

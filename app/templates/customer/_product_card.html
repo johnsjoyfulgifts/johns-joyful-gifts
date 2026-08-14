@@ -8,8 +8,12 @@
         <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;">🎁</div>
       {% endif %}
     </a>
-    {% if product.discount_percent %}<span class="product-card__badge">{{ product.discount_percent }}% OFF</span>
-    {% elif product.new_arrival %}<span class="product-card__badge">NEW</span>{% endif %}
+    <div class="product-card__badges">
+      {% if product.discount_percent %}<span class="product-card__badge product-card__badge--sale">SALE {{ product.discount_percent }}% OFF</span>{% endif %}
+      {% if product.bestseller %}<span class="product-card__badge">🏆 Bestseller</span>{% endif %}
+      {% if product.new_arrival %}<span class="product-card__badge">✨ New</span>{% endif %}
+      {% if product.featured %}<span class="product-card__badge">🌟 Featured</span>{% endif %}
+    </div>
     <button type="button" class="wishlist-heart js-wishlist-toggle" data-product-id="{{ product.id }}" aria-label="Save to wishlist" aria-pressed="false">🤍</button>
   </div>
   <div class="product-card__body">
@@ -20,10 +24,12 @@
         <span class="price--old">₹{{ "%.0f"|format(product.original_price) }}</span>
       {% endif %}
     </div>
-    {% if product.in_stock %}
-      <span class="stock-note">In stock</span>
+    {% if not product.in_stock %}
+      <span class="badge badge--danger">Out of Stock</span>
+    {% elif product.stock <= 5 %}
+      <span class="badge badge--warning">Low Stock — {{ product.stock }} left</span>
     {% else %}
-      <span class="stock-note stock-note--out">Out of stock</span>
+      <span class="badge badge--success">In Stock</span>
     {% endif %}
     <div class="product-card__cta">
       {% if product.in_stock %}

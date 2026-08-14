@@ -17,6 +17,20 @@
   <div class="stat-card__value" style="font-size:1.8rem;">₹{{ "%.0f"|format(total_sales) }}</div>
 </div>
 
+<h2 style="font-size:1rem; margin:20px 0 10px;">Products</h2>
+<div class="stat-grid">
+  <div class="stat-card"><div class="stat-card__value">{{ total_products }}</div><div class="stat-card__label">Total Products</div></div>
+  <div class="stat-card"><div class="stat-card__value">{{ active_products }}</div><div class="stat-card__label">Active Products</div></div>
+  <div class="stat-card"><div class="stat-card__value">{{ out_of_stock_count }}</div><div class="stat-card__label">Out of Stock</div></div>
+  <div class="stat-card"><div class="stat-card__value">{{ low_stock_count }}</div><div class="stat-card__label">Low Stock</div></div>
+  <div class="stat-card"><div class="stat-card__value">{{ featured_count }}</div><div class="stat-card__label">Featured</div></div>
+  <div class="stat-card"><div class="stat-card__value">{{ sale_count }}</div><div class="stat-card__label">On Sale</div></div>
+  <div class="stat-card"><div class="stat-card__value">{{ new_arrival_count }}</div><div class="stat-card__label">New Arrivals</div></div>
+  {% if pending_review_count %}
+  <div class="stat-card"><div class="stat-card__value">{{ pending_review_count }}</div><div class="stat-card__label">Reviews Pending</div></div>
+  {% endif %}
+</div>
+
 {% if out_of_stock_count > 0 or low_stock %}
 <div class="card" style="margin-top:16px;">
   <h2 style="font-size:1rem; margin-top:0;">Stock Alerts</h2>
@@ -73,4 +87,18 @@
   <div class="empty-state"><h3>No orders found.</h3></div>
   {% endif %}
 </div>
+
+{% if recent_products %}
+<div class="card" style="margin-top:16px;">
+  <h2 style="font-size:1rem; margin-top:0;">Recent Activity</h2>
+  <ul class="timeline">
+    {% for p in recent_products %}
+    <li class="done">
+      <div class="t-status"><a href="/admin/products/{{ p.id }}/edit">{{ p.name }}</a> added</div>
+      <div class="t-date">{{ p.created_at.strftime('%d %b %Y, %I:%M %p') }}</div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
 {% endblock %}

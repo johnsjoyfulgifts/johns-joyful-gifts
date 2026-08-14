@@ -6,20 +6,28 @@
 <div class="container page-section">
   <h1 class="section-title">{{ page_title }}</h1>
 
-  <form class="filter-bar" method="get">
-    {% if filters.category %}<input type="hidden" name="category" value="{{ filters.category }}">{% endif %}
-    <select name="sort" onchange="this.form.submit()">
+  <form class="filter-bar filter-bar--shop" method="get" action="/shop">
+    <input type="text" name="q" placeholder="Search products..." value="{{ filters.q }}" style="min-width:160px; flex:1;">
+    <select name="category">
+      <option value="">All Categories</option>
+      {% for cat in categories %}<option value="{{ cat.slug }}" {{ 'selected' if filters.category == cat.slug }}>{{ cat.name }}</option>{% endfor %}
+    </select>
+    <input type="number" name="min_price" placeholder="Min ₹" min="0" value="{{ filters.min_price if filters.min_price is not none else '' }}" style="width:90px;">
+    <input type="number" name="max_price" placeholder="Max ₹" min="0" value="{{ filters.max_price if filters.max_price is not none else '' }}" style="width:90px;">
+    <select name="sort">
       <option value="" {{ 'selected' if not filters.sort }}>Sort: Featured</option>
       <option value="newest" {{ 'selected' if filters.sort == 'newest' }}>Newest</option>
       <option value="price_asc" {{ 'selected' if filters.sort == 'price_asc' }}>Price: Low to High</option>
       <option value="price_desc" {{ 'selected' if filters.sort == 'price_desc' }}>Price: High to Low</option>
     </select>
     <label style="font-size:0.85rem; display:flex; align-items:center; gap:4px;">
-      <input type="checkbox" name="in_stock" value="true" {{ 'checked' if filters.in_stock }} onchange="this.form.submit()">
+      <input type="checkbox" name="in_stock" value="true" {{ 'checked' if filters.in_stock }}>
       In stock only
     </label>
-    <span class="text-muted" style="font-size:0.82rem;">{{ total }} product{{ 's' if total != 1 }}</span>
+    <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+    {% if has_active_filters %}<a href="/shop" class="btn btn-sm btn-secondary">Clear Filters</a>{% endif %}
   </form>
+  <p class="text-muted" style="font-size:0.82rem; margin-top:-6px;">{{ total }} product{{ 's' if total != 1 }} found</p>
 
   {% if products %}
   <div class="product-grid">
@@ -46,7 +54,8 @@
   <div class="empty-state">
     <div class="empty-state__icon">🔍</div>
     <h3>No products available right now.</h3>
-    <p>Try a different filter or check back soon.</p>
+    <p>Try a different search or filter, or check back soon.</p>
+    {% if has_active_filters %}<a class="btn btn-primary" href="/shop" style="margin-top:12px;">Clear Filters</a>{% endif %}
   </div>
   {% endif %}
 </div>

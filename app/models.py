@@ -210,6 +210,27 @@ class OrderStatusHistory(Base):
     order: Mapped["Order"] = relationship(back_populates="status_history")
 
 
+class Review(Base):
+    __tablename__ = "reviews"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), index=True)
+    rating: Mapped[int] = mapped_column(Integer)
+    review_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Admin moderates every review before it's public — a submission (new or
+    # edited) always starts unapproved, even if a prior version of the same
+    # customer's review for this product had already been approved.
+    approved: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    product: Mapped["Product"] = relationship()
+    customer: Mapped["Customer"] = relationship()
+
+    __table_args__ = (UniqueConstraint("product_id", "customer_id", name="uq_review_product_customer"),)
+
+
 class Coupon(Base):
     __tablename__ = "coupons"
 

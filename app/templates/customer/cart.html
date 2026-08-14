@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_whatsapp_icon.html" as wa %}
 {% block title %}Your Cart — {{ store.store_name }}{% endblock %}
 
 {% block content %}
@@ -41,7 +42,13 @@
       <div class="cart-summary-row"><span>Delivery</span><span>{{ '₹%.0f'|format(delivery_charge) if delivery_charge else 'FREE' }}</span></div>
       <div class="cart-summary-row cart-summary-row--total"><span>Total</span><span>₹{{ "%.0f"|format(total) }}</span></div>
       <a href="/checkout" class="btn btn-primary btn-block" style="margin-top:14px;">Proceed to Checkout</a>
+      {% if cart_whatsapp_link %}
+      <a href="{{ cart_whatsapp_link }}" target="_blank" rel="noopener" class="btn btn-whatsapp btn-block" style="margin-top:8px;">{{ wa.whatsapp_icon(18) }} Order / Enquire via WhatsApp</a>
+      {% endif %}
       <a href="/shop" class="btn btn-secondary btn-block" style="margin-top:8px;">Continue Shopping</a>
+      <form method="post" action="/api/cart/clear" onsubmit="return confirm('Remove all items from your cart?');" style="margin-top:8px;">
+        <button type="submit" class="btn btn-outline btn-block">Clear Cart</button>
+      </form>
     </div>
   </div>
   <style>@media (min-width: 780px) { .cart-layout { grid-template-columns: 2fr 1fr !important; align-items: start; } }</style>

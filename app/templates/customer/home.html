@@ -73,6 +73,18 @@
   </section>
   {% endif %}
 
+  {% if special_offers %}
+  <section class="page-section">
+    <div class="section-title--row">
+      <h2 class="section-title mb-0">Special Offers</h2>
+      <a href="/shop">See all</a>
+    </div>
+    <div class="product-grid">
+      {% for p in special_offers %}{{ cards.product_card(p) }}{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
   <section class="page-section">
     <div class="trust-grid">
       <div class="trust-item"><div class="trust-item__icon">🚚</div><div class="trust-item__title">Reliable Delivery</div></div>

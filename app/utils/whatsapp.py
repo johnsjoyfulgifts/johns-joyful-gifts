@@ -22,6 +22,18 @@ def product_enquiry_message(product: Product) -> str:
     )
 
 
+def cart_enquiry_message(lines, subtotal: float, total: float) -> str:
+    parts = ["Hi, I'd like to order the following:", ""]
+    for line in lines:
+        parts.append(f"- {line.product.name} x{line.quantity} @ ₹{line.product.price:.0f} = ₹{line.subtotal:.0f}")
+    parts.append("")
+    parts.append(f"Subtotal: ₹{subtotal:.0f}")
+    parts.append(f"Cart Total: ₹{total:.0f}")
+    parts.append("")
+    parts.append("Please confirm availability and delivery details.")
+    return "\n".join(parts)
+
+
 def order_confirmation_message(order: Order) -> str:
     lines = [
         f"Hi! I just placed order {order.order_number} on John's Joyful Gifts.",

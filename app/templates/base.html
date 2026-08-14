@@ -133,6 +133,13 @@
   </footer>
 
   <script src="/static/js/cart.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').catch(function () { /* PWA install is a bonus, not required */ });
+      });
+    }
+  </script>
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>

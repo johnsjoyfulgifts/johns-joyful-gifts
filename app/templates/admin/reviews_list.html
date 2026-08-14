@@ -1,0 +1,44 @@
+{% extends "admin/base_admin.html" %}
+{% import "_stars.html" as stars_macro %}
+{% block title %}Reviews — Admin{% endblock %}
+{% block page_title %}Reviews{% endblock %}
+
+{% block admin_content %}
+<div class="flex justify-between items-center" style="margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+  <span class="text-muted">{{ reviews|length }} reviews{% if pending_count %} · {{ pending_count }} pending{% endif %}</span>
+  <div class="flex gap-8">
+    <a class="btn btn-sm {{ 'btn-primary' if not status else 'btn-secondary' }}" href="/admin/reviews">All</a>
+    <a class="btn btn-sm {{ 'btn-primary' if status == 'pending' else 'btn-secondary' }}" href="/admin/reviews?status=pending">Pending</a>
+    <a class="btn btn-sm {{ 'btn-primary' if status == 'approved' else 'btn-secondary' }}" href="/admin/reviews?status=approved">Approved</a>
+  </div>
+</div>
+
+{% if reviews %}
+<div style="display:flex; flex-direction:column; gap:12px;">
+  {% for r in reviews %}
+  <div class="card">
+    <div class="flex justify-between items-center" style="flex-wrap:wrap; gap:8px;">
+      <div>
+        <strong>{{ r.product.name if r.product else '(deleted product)' }}</strong>
+        <span class="text-muted" style="font-size:0.8rem; margin-left:8px;">by {{ r.customer.name if r.customer else '(deleted customer)' }}</span>
+      </div>
+      {% if r.approved %}<span class="badge badge--success">Approved</span>{% else %}<span class="badge badge--warning">Pending</span>{% endif %}
+    </div>
+    <div style="color:var(--color-accent); margin:6px 0;">{{ stars_macro.stars(r.rating) }}</div>
+    {% if r.review_text %}<p style="margin:0 0 8px;">{{ r.review_text }}</p>{% endif %}
+    <p class="text-muted" style="font-size:0.78rem; margin:0 0 10px;">{{ r.created_at.strftime('%d %b %Y, %I:%M %p') }}</p>
+    <div class="flex gap-8">
+      {% if not r.approved %}
+      <form method="post" action="/admin/reviews/{{ r.id }}/approve"><button type="submit" class="btn btn-sm btn-primary">Approve</button></form>
+      {% else %}
+      <form method="post" action="/admin/reviews/{{ r.id }}/hide"><button type="submit" class="btn btn-sm btn-secondary">Hide</button></form>
+      {% endif %}
+      <form method="post" action="/admin/reviews/{{ r.id }}/delete" onsubmit="return confirm('Delete this review permanently?');"><button type="submit" class="btn btn-sm btn-danger">Delete</button></form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state"><h3>No reviews yet.</h3></div>
+{% endif %}
+{% endblock %}
