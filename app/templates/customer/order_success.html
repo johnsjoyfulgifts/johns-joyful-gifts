@@ -16,6 +16,12 @@
     <div class="cart-summary-row"><span>Delivery</span><span>{{ '₹%.0f'|format(order.delivery_charge) if order.delivery_charge else 'FREE' }}</span></div>
     <div class="cart-summary-row cart-summary-row--total"><span>Total</span><span>₹{{ "%.0f"|format(order.total) }}</span></div>
     <p class="text-muted" style="font-size:0.85rem; margin-top:10px;">Payment: {{ order.payment_method }}</p>
+    {% if order.gift_wrap or order.gift_message %}
+    <div style="border-top:1px solid var(--color-border); margin-top:10px; padding-top:10px;">
+      {% if order.gift_wrap %}<p class="badge badge--info">🎁 Gift Wrapped</p>{% endif %}
+      {% if order.gift_message %}<p class="text-muted" style="font-size:0.85rem; font-style:italic; margin-top:6px;">"{{ order.gift_message }}"</p>{% endif %}
+    </div>
+    {% endif %}
   </div>
 
   {% if order.payment_method == "UPI / Bank Transfer" %}

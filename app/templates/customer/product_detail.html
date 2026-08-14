@@ -76,6 +76,11 @@
         {{ wa.whatsapp_icon(18) }} Enquire on WhatsApp
       </a>
 
+      <div class="flex items-center gap-8" style="margin-bottom:10px;">
+        <button type="button" class="wishlist-heart wishlist-heart--inline js-wishlist-toggle" data-product-id="{{ product.id }}" aria-label="Save to wishlist" aria-pressed="false">🤍</button>
+        <span class="text-muted" style="font-size:0.85rem;">Save for later</span>
+      </div>
+
       {% if product.in_stock %}
       <form class="js-cart-form" action="/api/cart/add" method="post" data-reload-on-success="true" style="margin:18px 0;">
         <input type="hidden" name="product_id" value="{{ product.id }}">

@@ -95,6 +95,19 @@
       </div>
     </div>
 
+    <h2 style="font-size:1rem;">Announcement Banner</h2>
+    <p class="field-hint" style="margin-top:-6px;">A strip shown at the top of every page — good for festival sales or "free delivery this week" notices.</p>
+    <div class="form-group">
+      <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+        <input type="checkbox" name="announcement_enabled" value="true" {{ 'checked' if values.announcement_enabled == 'true' }}>
+        Show announcement banner
+      </label>
+    </div>
+    <div class="form-group">
+      <label for="announcement_text">Announcement Text</label>
+      <input class="form-control" id="announcement_text" name="announcement_text" maxlength="200" value="{{ values.announcement_text }}" placeholder="🎉 Diwali Sale — Free delivery on orders above ₹999!">
+    </div>
+
     <h2 style="font-size:1rem;">About Page</h2>
     <div class="form-group">
       <label for="about_text">About Us Text</label>

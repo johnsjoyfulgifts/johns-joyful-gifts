@@ -17,6 +17,8 @@ class CheckoutRequest(BaseModel):
     delivery_instructions: str | None = None
     idempotency_key: str
     payment_method: str = "cod"
+    gift_wrap: bool = False
+    gift_message: str | None = None
 
     @field_validator("address", "city", "state")
     @classmethod
@@ -48,6 +50,16 @@ class CheckoutRequest(BaseModel):
         if value not in ("cod", "manual"):
             raise ValueError("Invalid payment method.")
         return value
+
+    @field_validator("gift_message")
+    @classmethod
+    def valid_gift_message(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if len(value) > 300:
+            raise ValueError("Gift message must be 300 characters or fewer.")
+        return value or None
 
 
 class RegisterRequest(BaseModel):

@@ -44,6 +44,18 @@
           <textarea class="form-control" id="delivery_instructions" name="delivery_instructions" rows="2"></textarea>
         </div>
 
+        <h2 style="font-size:1rem;">🎁 Gift Options (optional)</h2>
+        <div class="form-group">
+          <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+            <input type="checkbox" name="gift_wrap" value="true" id="gift_wrap">
+            Wrap this as a gift
+          </label>
+        </div>
+        <div class="form-group">
+          <label for="gift_message">Gift Message (optional)</label>
+          <textarea class="form-control" id="gift_message" name="gift_message" rows="2" maxlength="300" placeholder="Write a short note for the recipient..."></textarea>
+        </div>
+
         <h2 style="font-size:1rem;">Payment Method</h2>
         {% if manual_payment_available %}
         <div class="form-group" style="display:flex; flex-direction:column; gap:8px;">

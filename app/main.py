@@ -18,6 +18,20 @@ settings = get_settings()
 
 app = FastAPI(title="John's Joyful Gifts")
 
+
+@app.middleware("http")
+async def no_cache_static_assets(request: Request, call_next):
+    """Without this, browsers heuristically cache /static files (no explicit
+    Cache-Control from StaticFiles) — after a deploy, returning visitors could
+    silently keep running old JS/CSS until that cache expires. "no-cache"
+    forces revalidation via ETag on every request; unchanged files still get
+    a cheap 304, so this costs nothing but guarantees freshness."""
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 BASE_DIR = os.path.dirname(__file__)
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
@@ -95,6 +109,7 @@ from app.routers import (  # noqa: E402
     customer_auth,
     customer_pages,
     tracking,
+    wishlist,
 )
 
 app.include_router(customer_pages.router)
@@ -102,5 +117,6 @@ app.include_router(customer_auth.router)
 app.include_router(cart.router)
 app.include_router(checkout.router)
 app.include_router(tracking.router)
+app.include_router(wishlist.router)
 app.include_router(admin_pages.router)
 app.include_router(admin_api.router)

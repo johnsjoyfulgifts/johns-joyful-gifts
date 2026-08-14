@@ -22,6 +22,28 @@
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
 
+  {% if store.announcement_enabled == 'true' and store.announcement_text %}
+  <div class="announcement-bar" id="announcement-bar" data-text="{{ store.announcement_text }}">
+    <span>{{ store.announcement_text }}</span>
+    <button type="button" class="announcement-bar__close" id="announcement-close" aria-label="Dismiss announcement">×</button>
+  </div>
+  <script>
+    (function () {
+      var bar = document.getElementById('announcement-bar');
+      if (!bar) return;
+      var key = 'jjg-announcement-dismissed';
+      if (localStorage.getItem(key) === bar.getAttribute('data-text')) {
+        bar.style.display = 'none';
+        return;
+      }
+      document.getElementById('announcement-close').addEventListener('click', function () {
+        localStorage.setItem(key, bar.getAttribute('data-text'));
+        bar.style.display = 'none';
+      });
+    })();
+  </script>
+  {% endif %}
+
   <header class="site-header">
     <div class="site-header__bar">
       <a class="brand" href="/" aria-label="{{ store.store_name }} home">
@@ -42,6 +64,9 @@
         {% else %}
         <a class="icon-link" href="/login" aria-label="Log In">👤</a>
         {% endif %}
+        <a class="icon-link" href="/wishlist" id="wishlist-icon-link" aria-label="My Wishlist">
+          ❤️
+        </a>
         <a class="icon-link" href="/cart" aria-label="View cart, {{ cart_count|default(0) }} items">
           🛒
           {% if cart_count %}<span class="cart-badge">{{ cart_count }}</span>{% endif %}

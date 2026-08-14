@@ -23,6 +23,8 @@ DEFAULTS: dict[str, str] = {
     "about_text": "We're a small family-run gift shop. Details coming soon.",
     "contact_email": "",
     "contact_address": "",
+    "announcement_enabled": "false",
+    "announcement_text": "",
     "manual_payment_enabled": "false",
     "upi_id": "",
     "bank_account_name": "",

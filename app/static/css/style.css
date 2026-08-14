@@ -51,6 +51,17 @@ h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; letter-spacing:
   width: 100%;
 }
 
+/* Announcement banner */
+.announcement-bar {
+  background: var(--color-primary); color: #fff; text-align: center; font-size: 0.85rem; font-weight: 600;
+  padding: 10px 40px 10px 16px; position: relative;
+}
+.announcement-bar__close {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none;
+  color: #fff; font-size: 1.2rem; line-height: 1; opacity: 0.85; padding: 4px 8px;
+}
+.announcement-bar__close:hover { opacity: 1; }
+
 /* Header */
 .site-header {
   position: sticky;
@@ -184,6 +195,15 @@ main { flex: 1; }
 .stock-note { font-size: 0.72rem; color: var(--color-text-muted); }
 .stock-note--out { color: var(--color-danger); font-weight: 700; }
 .product-card__cta { margin-top: auto; }
+
+.wishlist-heart {
+  position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%;
+  background: rgba(255,255,255,0.92); border: none; font-size: 0.95rem; display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-sm); transition: transform 0.15s var(--ease), background-color 0.15s var(--ease);
+}
+.wishlist-heart:hover { transform: scale(1.1); }
+.wishlist-heart[aria-pressed="true"] { background: #fff; }
+.wishlist-heart--inline { position: static; border: 1px solid var(--color-border); }
 
 /* Product detail */
 .product-detail { display: grid; gap: 24px; }

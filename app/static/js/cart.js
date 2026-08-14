@@ -79,6 +79,85 @@
     showToast(form.dataset.successMessage || "Cart updated!");
   });
 
+  // ---- Wishlist ----
+  function updateWishlistBadge(count) {
+    var link = document.getElementById("wishlist-icon-link");
+    if (!link) return;
+    var badge = link.querySelector(".cart-badge");
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement("span");
+        badge.className = "cart-badge";
+        link.appendChild(badge);
+      }
+      badge.textContent = count;
+    } else if (badge) {
+      badge.remove();
+    }
+  }
+
+  function setHeartState(btn, active) {
+    btn.setAttribute("aria-pressed", active ? "true" : "false");
+    btn.textContent = active ? "❤️" : "🤍";
+  }
+
+  function initWishlistHearts() {
+    var hearts = document.querySelectorAll(".js-wishlist-toggle");
+    if (!hearts.length && !document.getElementById("wishlist-icon-link")) return;
+    fetch("/api/wishlist/ids", { headers: { Accept: "application/json" } })
+      .then(function (res) { return res.ok ? res.json() : { ids: [] }; })
+      .then(function (data) {
+        var ids = data.ids || [];
+        updateWishlistBadge(ids.length);
+        hearts.forEach(function (btn) {
+          var pid = parseInt(btn.getAttribute("data-product-id"), 10);
+          if (ids.indexOf(pid) !== -1) setHeartState(btn, true);
+        });
+      })
+      .catch(function () { /* silent: wishlist state is a convenience, not required */ });
+  }
+
+  document.addEventListener("click", async function (event) {
+    var btn = event.target.closest(".js-wishlist-toggle");
+    if (!btn) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (btn.disabled) return;
+    btn.disabled = true;
+
+    try {
+      var res = await fetch("/api/wishlist/toggle", {
+        method: "POST",
+        body: new URLSearchParams({ product_id: btn.getAttribute("data-product-id") }),
+        headers: { Accept: "application/json" },
+      });
+      if (res.status === 401) {
+        window.location.href = "/login?next=" + encodeURIComponent(window.location.pathname);
+        return;
+      }
+      if (!res.ok) throw new Error("Request failed");
+      var data = await res.json();
+      var allSameProduct = document.querySelectorAll(
+        '.js-wishlist-toggle[data-product-id="' + btn.getAttribute("data-product-id") + '"]'
+      );
+      allSameProduct.forEach(function (other) { setHeartState(other, data.in_wishlist); });
+      showToast(data.in_wishlist ? "Saved to wishlist" : "Removed from wishlist");
+      // Badge count is the customer's total wishlist size, not derivable from
+      // hearts visible on this page — always refetch it fresh from the server.
+      fetch("/api/wishlist/ids", { headers: { Accept: "application/json" } })
+        .then(function (r) { return r.ok ? r.json() : { ids: [] }; })
+        .then(function (d) { updateWishlistBadge((d.ids || []).length); })
+        .catch(function () {});
+    } catch (err) {
+      showToast("Something went wrong. Please try again.");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.addEventListener("DOMContentLoaded", initWishlistHearts);
+  if (document.readyState !== "loading") initWishlistHearts();
+
   // Quantity steppers used on product detail + cart lines.
   document.addEventListener("click", function (event) {
     var target = event.target.closest("[data-qty-step]");

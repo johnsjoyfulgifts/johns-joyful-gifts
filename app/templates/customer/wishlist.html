@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% import "customer/_product_card.html" as cards %}
+{% block title %}My Wishlist — {{ store.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container page-section">
+  <h1 class="section-title">My Wishlist</h1>
+  {% if products %}
+  <div class="product-grid">
+    {% for p in products %}{{ cards.product_card(p) }}{% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state__icon">🤍</div>
+    <h3>Your wishlist is empty.</h3>
+    <p>Tap the heart on any product to save it here for later.</p>
+    <a class="btn btn-primary" href="/shop" style="margin-top:12px;">Start Shopping</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

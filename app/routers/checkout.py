@@ -144,6 +144,8 @@ async def api_checkout(
             order_status=OrderStatus.PLACED.value,
             notes=checkout_data.delivery_instructions or None,
             idempotency_key=checkout_data.idempotency_key,
+            gift_wrap=checkout_data.gift_wrap,
+            gift_message=checkout_data.gift_message,
         )
         db.add(order)
         db.flush()

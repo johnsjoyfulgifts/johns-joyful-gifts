@@ -1,14 +1,17 @@
 {% macro product_card(product) %}
 <div class="product-card">
-  <a href="/product/{{ product.slug }}" class="product-card__img" aria-label="{{ product.name }}">
-    {% if product.primary_image %}
-      <img src="{{ product.primary_image.image_url }}" alt="{{ product.name }}" loading="lazy">
-    {% else %}
-      <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;">🎁</div>
-    {% endif %}
+  <div class="product-card__img">
+    <a href="/product/{{ product.slug }}" aria-label="{{ product.name }}" style="display:block;width:100%;height:100%;">
+      {% if product.primary_image %}
+        <img src="{{ product.primary_image.image_url }}" alt="{{ product.name }}" loading="lazy">
+      {% else %}
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;">🎁</div>
+      {% endif %}
+    </a>
     {% if product.discount_percent %}<span class="product-card__badge">{{ product.discount_percent }}% OFF</span>
     {% elif product.new_arrival %}<span class="product-card__badge">NEW</span>{% endif %}
-  </a>
+    <button type="button" class="wishlist-heart js-wishlist-toggle" data-product-id="{{ product.id }}" aria-label="Save to wishlist" aria-pressed="false">🤍</button>
+  </div>
   <div class="product-card__body">
     <a href="/product/{{ product.slug }}"><div class="product-card__name">{{ product.name }}</div></a>
     <div class="product-card__price">

@@ -171,6 +171,8 @@ class Order(Base):
     idempotency_key: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     viewed_by_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     stock_restored: Mapped[bool] = mapped_column(Boolean, default=False)
+    gift_wrap: Mapped[bool] = mapped_column(Boolean, default=False)
+    gift_message: Mapped[str | None] = mapped_column(String(300), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
@@ -204,6 +206,20 @@ class OrderStatusHistory(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     order: Mapped["Order"] = relationship(back_populates="status_history")
+
+
+class Wishlist(Base):
+    __tablename__ = "wishlist_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+    customer: Mapped["Customer"] = relationship()
+    product: Mapped["Product"] = relationship()
+
+    __table_args__ = (UniqueConstraint("customer_id", "product_id", name="uq_wishlist_customer_product"),)
 
 
 class Setting(Base):
