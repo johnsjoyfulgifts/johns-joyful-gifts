@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% import "customer/_product_card.html" as cards %}
+{% import "_whatsapp_icon.html" as wa %}
 {% block title %}{{ product.name }} — {{ store.store_name }}{% endblock %}
 {% block meta_description %}{{ product.short_description or product.name }}{% endblock %}
 
@@ -19,20 +20,37 @@
 
   <div class="product-detail">
     <div>
-      <div class="product-gallery__main">
+      <div class="product-gallery__main" style="position:relative;">
         {% if product.images %}
           <img id="main-product-image" src="{{ product.images[0].image_url }}" alt="{{ product.name }}">
+          {% if product.images|length > 1 %}
+          <button type="button" class="gallery-nav gallery-nav--prev" id="gallery-prev" aria-label="Previous image">‹</button>
+          <button type="button" class="gallery-nav gallery-nav--next" id="gallery-next" aria-label="Next image">›</button>
+          {% endif %}
         {% else %}
           <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:3rem;">🎁</div>
         {% endif %}
       </div>
       {% if product.images|length > 1 %}
-      <div class="product-gallery__thumbs">
+      <div class="product-gallery__thumbs" id="gallery-thumbs">
         {% for img in product.images %}
-        <img src="{{ img.image_url }}" alt="" class="{{ 'active' if loop.first }}"
-             onclick="document.getElementById('main-product-image').src=this.src; document.querySelectorAll('.product-gallery__thumbs img').forEach(function(t){t.classList.remove('active')}); this.classList.add('active');">
+        <img src="{{ img.image_url }}" alt="" class="{{ 'active' if loop.first }}" data-index="{{ loop.index0 }}"
+             onclick="setGalleryImage({{ loop.index0 }});">
         {% endfor %}
       </div>
+      <script>
+        var galleryImages = [{% for img in product.images %}"{{ img.image_url }}"{{ ',' if not loop.last }}{% endfor %}];
+        var galleryIndex = 0;
+        function setGalleryImage(i) {
+          galleryIndex = (i + galleryImages.length) % galleryImages.length;
+          document.getElementById('main-product-image').src = galleryImages[galleryIndex];
+          document.querySelectorAll('#gallery-thumbs img').forEach(function (t) {
+            t.classList.toggle('active', parseInt(t.getAttribute('data-index'), 10) === galleryIndex);
+          });
+        }
+        document.getElementById('gallery-prev').addEventListener('click', function () { setGalleryImage(galleryIndex - 1); });
+        document.getElementById('gallery-next').addEventListener('click', function () { setGalleryImage(galleryIndex + 1); });
+      </script>
       {% endif %}
     </div>
 
@@ -53,6 +71,10 @@
       {% else %}
         <p class="badge badge--danger">Out of Stock</p>
       {% endif %}
+
+      <a class="btn btn-whatsapp btn-block" href="{{ product_whatsapp_link }}" target="_blank" rel="noopener" style="margin-bottom:10px;">
+        {{ wa.whatsapp_icon(18) }} Enquire on WhatsApp
+      </a>
 
       {% if product.in_stock %}
       <form class="js-cart-form" action="/api/cart/add" method="post" data-reload-on-success="true" style="margin:18px 0;">

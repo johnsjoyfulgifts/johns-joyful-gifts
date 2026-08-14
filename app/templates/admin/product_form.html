@@ -5,7 +5,7 @@
 {% block admin_content %}
 <div class="card" style="max-width:720px;">
   {% if error %}<div class="alert alert--error">{{ error }}</div>{% endif %}
-  <form method="post" enctype="multipart/form-data">
+  <form method="post" enctype="multipart/form-data" id="product-form">
     <div class="form-group">
       <label for="name">Product Name *</label>
       <input class="form-control" id="name" name="name" value="{{ product.name if product else '' }}" required>
@@ -62,15 +62,22 @@
       </label>
     </div>
 
+    <input type="hidden" name="image_order" id="image-order-input" value="{% if product %}{{ product.images|map(attribute='id')|join(',') }}{% endif %}">
+
     {% if product and product.images %}
     <div class="form-group">
       <label>Current Images</label>
-      <div class="image-upload-grid">
+      <p class="field-hint" style="margin-top:-2px;">Drag to reorder, or use "Make Primary". The first image is what customers see first.</p>
+      <div class="image-upload-grid" id="existing-images-grid">
         {% for img in product.images %}
-        <div class="image-upload-grid__item">
+        <div class="image-upload-grid__item" draggable="true" data-image-id="{{ img.id }}">
           <div class="thumb-preview"><img src="{{ img.image_url }}" alt=""></div>
+          <div style="text-align:center; margin-top:4px;">
+            <span class="badge badge--info primary-badge" style="{{ '' if loop.first else 'display:none;' }} font-size:0.62rem; padding:2px 7px;">Primary</span>
+            <button type="button" class="btn btn-sm btn-outline make-primary-btn" style="{{ 'display:none;' if loop.first else '' }} margin-top:3px; padding:3px 8px; font-size:0.68rem;">★ Make Primary</button>
+          </div>
           <label style="display:flex;align-items:center;gap:4px;font-size:0.72rem;font-weight:400;justify-content:center;margin-top:4px;">
-            <input type="checkbox" name="delete_image_ids" value="{{ img.id }}"> Remove
+            <input type="checkbox" name="delete_image_ids" value="{{ img.id }}" class="delete-image-checkbox"> Remove
           </label>
         </div>
         {% endfor %}
@@ -79,9 +86,18 @@
     {% endif %}
 
     <div class="form-group">
-      <label for="images">{{ 'Add More Images' if product and product.images else 'Product Images' }}</label>
-      <input class="form-control" id="images" type="file" name="images" accept="image/jpeg,image/png,image/webp" multiple>
-      <p class="field-hint">JPG, PNG or WEBP. Large photos are automatically resized.</p>
+      <label for="images">{{ 'Add More Images' if product and product.images else 'Product Images *' }}</label>
+      <input type="file" id="images-picker" name="images" accept="image/jpeg,image/png,image/webp" multiple style="display:none;">
+      <button type="button" id="images-picker-btn" class="btn btn-secondary btn-sm">📷 Choose Images</button>
+      <span id="image-count-hint" class="field-hint" style="margin-left:8px;"></span>
+      <div class="image-upload-grid" id="new-image-previews" style="margin-top:10px;"></div>
+      <p class="field-hint">
+        {% if product and product.images %}
+        JPG, PNG or WEBP. Large photos are automatically resized. Maximum 6 images total per product.
+        {% else %}
+        JPG, PNG or WEBP. Large photos are automatically resized. Upload 4–6 images — the first one becomes the main product photo.
+        {% endif %}
+      </p>
     </div>
 
     <div class="flex gap-8">
@@ -90,4 +106,137 @@
     </div>
   </form>
 </div>
+
+<script>
+(function () {
+  var MAX_IMAGES = 6;
+  var MIN_IMAGES_NEW = 4;
+  var isEdit = {{ 'true' if product else 'false' }};
+
+  var form = document.getElementById('product-form');
+  var grid = document.getElementById('existing-images-grid');
+  var orderInput = document.getElementById('image-order-input');
+  var previewGrid = document.getElementById('new-image-previews');
+  var picker = document.getElementById('images-picker');
+  var pickerBtn = document.getElementById('images-picker-btn');
+  var hint = document.getElementById('image-count-hint');
+  var stagedFiles = [];
+
+  // ---- Existing-image reorder + "Make Primary" (edit mode only) ----
+  function updateOrderInput() {
+    if (!grid) return;
+    var ids = Array.prototype.map.call(grid.querySelectorAll('.image-upload-grid__item'), function (el) {
+      return el.getAttribute('data-image-id');
+    });
+    orderInput.value = ids.join(',');
+    Array.prototype.forEach.call(grid.querySelectorAll('.image-upload-grid__item'), function (el, idx) {
+      el.querySelector('.primary-badge').style.display = idx === 0 ? '' : 'none';
+      el.querySelector('.make-primary-btn').style.display = idx === 0 ? 'none' : '';
+    });
+  }
+
+  if (grid) {
+    var dragged = null;
+    grid.addEventListener('dragstart', function (e) {
+      var item = e.target.closest('.image-upload-grid__item');
+      if (!item) return;
+      dragged = item;
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    grid.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      var target = e.target.closest('.image-upload-grid__item');
+      if (!target || target === dragged || !dragged) return;
+      var rect = target.getBoundingClientRect();
+      var before = (e.clientX - rect.left) < rect.width / 2;
+      grid.insertBefore(dragged, before ? target : target.nextSibling);
+    });
+    grid.addEventListener('drop', function (e) {
+      e.preventDefault();
+      updateOrderInput();
+    });
+
+    grid.addEventListener('click', function (e) {
+      if (!e.target.classList.contains('make-primary-btn')) return;
+      var item = e.target.closest('.image-upload-grid__item');
+      grid.insertBefore(item, grid.firstChild);
+      updateOrderInput();
+    });
+
+    grid.addEventListener('change', function (e) {
+      if (!e.target.classList.contains('delete-image-checkbox')) return;
+      refreshHint();
+    });
+  }
+
+  function existingRemainingCount() {
+    if (!grid) return 0;
+    var checked = grid.querySelectorAll('.delete-image-checkbox:checked').length;
+    return grid.querySelectorAll('.image-upload-grid__item').length - checked;
+  }
+
+  // ---- New-file staging: preview, per-file remove, count cap ----
+  function syncPickerFiles() {
+    var dt = new DataTransfer();
+    stagedFiles.forEach(function (f) { dt.items.add(f); });
+    picker.files = dt.files;
+  }
+
+  function renderPreviews() {
+    previewGrid.innerHTML = '';
+    stagedFiles.forEach(function (file, idx) {
+      var url = URL.createObjectURL(file);
+      var item = document.createElement('div');
+      item.className = 'image-upload-grid__item';
+      item.innerHTML =
+        '<div class="thumb-preview"><img src="' + url + '" alt=""></div>' +
+        '<button type="button" class="image-upload-grid__remove" aria-label="Remove image" data-idx="' + idx + '">×</button>';
+      previewGrid.appendChild(item);
+    });
+    refreshHint();
+  }
+
+  previewGrid.addEventListener('click', function (e) {
+    if (!e.target.classList.contains('image-upload-grid__remove')) return;
+    var idx = parseInt(e.target.getAttribute('data-idx'), 10);
+    stagedFiles.splice(idx, 1);
+    syncPickerFiles();
+    renderPreviews();
+  });
+
+  function refreshHint() {
+    var total = existingRemainingCount() + stagedFiles.length;
+    if (isEdit) {
+      hint.textContent = total + ' of ' + MAX_IMAGES + ' images (existing + new)';
+    } else {
+      hint.textContent = stagedFiles.length + ' of ' + MAX_IMAGES + ' selected (minimum ' + MIN_IMAGES_NEW + ' required)';
+    }
+    hint.style.color = (isEdit ? total > MAX_IMAGES : (stagedFiles.length < MIN_IMAGES_NEW || stagedFiles.length > MAX_IMAGES))
+      ? 'var(--color-danger)' : 'var(--color-text-muted)';
+  }
+
+  pickerBtn.addEventListener('click', function () { picker.click(); });
+
+  picker.addEventListener('change', function () {
+    var allowed = MAX_IMAGES - existingRemainingCount();
+    var incoming = Array.prototype.slice.call(picker.files);
+    incoming.forEach(function (file) {
+      if (stagedFiles.length < allowed) stagedFiles.push(file);
+    });
+    syncPickerFiles();
+    renderPreviews();
+  });
+
+  form.addEventListener('submit', function (e) {
+    if (!isEdit && (stagedFiles.length < MIN_IMAGES_NEW || stagedFiles.length > MAX_IMAGES)) {
+      e.preventDefault();
+      hint.style.color = 'var(--color-danger)';
+      hint.textContent = 'Please select between ' + MIN_IMAGES_NEW + ' and ' + MAX_IMAGES + ' images before saving.';
+      picker.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+
+  refreshHint();
+})();
+</script>
 {% endblock %}

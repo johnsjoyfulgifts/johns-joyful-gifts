@@ -32,6 +32,8 @@ from app.utils.slugs import unique_slug
 router = APIRouter(prefix="/admin")
 
 ORDER_STATUSES = [s.value for s in OrderStatus]
+MIN_PRODUCT_IMAGES = 4
+MAX_PRODUCT_IMAGES = 6
 
 
 # ---------- Auth ----------
@@ -333,6 +335,7 @@ async def product_new_submit(
     admin: Admin = Depends(require_admin),
 ):
     name = name.strip()
+    uploaded_images = [img for img in images if img is not None and img.filename]
     error = None
     if not name:
         error = "Product name is required."
@@ -340,19 +343,22 @@ async def product_new_submit(
         error = "Price cannot be negative."
     elif stock < 0:
         error = "Stock cannot be negative."
+    elif len(uploaded_images) < MIN_PRODUCT_IMAGES:
+        error = f"Please upload at least {MIN_PRODUCT_IMAGES} product images (maximum {MAX_PRODUCT_IMAGES})."
+    elif len(uploaded_images) > MAX_PRODUCT_IMAGES:
+        error = f"You can upload a maximum of {MAX_PRODUCT_IMAGES} product images."
 
     if error:
         return render_admin(request, "admin/product_form.html", _product_form_context(db, error=error), db, status_code=400)
 
     saved_urls = []
-    for image in images:
-        if image is not None and image.filename:
-            try:
-                saved_urls.append(save_product_image(image))
-            except UploadValidationError as exc:
-                for url in saved_urls:
-                    delete_product_image(url)
-                return render_admin(request, "admin/product_form.html", _product_form_context(db, error=exc.detail), db, status_code=400)
+    for image in uploaded_images:
+        try:
+            saved_urls.append(save_product_image(image))
+        except UploadValidationError as exc:
+            for url in saved_urls:
+                delete_product_image(url)
+            return render_admin(request, "admin/product_form.html", _product_form_context(db, error=exc.detail), db, status_code=400)
 
     product = Product(
         name=name,
@@ -405,6 +411,7 @@ async def product_edit_submit(
     active: bool = Form(True),
     delete_image_ids: list[int] = Form(default=[]),
     images: list[UploadFile] = FastAPIFile(default=[]),
+    image_order: str = Form(""),
     db: Session = Depends(get_db),
     admin: Admin = Depends(require_admin),
 ):
@@ -413,6 +420,8 @@ async def product_edit_submit(
         return RedirectResponse(url="/admin/products", status_code=303)
 
     name = name.strip()
+    uploaded_images = [img for img in images if img is not None and img.filename]
+    remaining_existing = [img for img in product.images if img.id not in delete_image_ids]
     error = None
     if not name:
         error = "Product name is required."
@@ -420,6 +429,8 @@ async def product_edit_submit(
         error = "Price cannot be negative."
     elif stock < 0:
         error = "Stock cannot be negative."
+    elif len(remaining_existing) + len(uploaded_images) > MAX_PRODUCT_IMAGES:
+        error = f"A product can have a maximum of {MAX_PRODUCT_IMAGES} images. Please remove some before adding more."
 
     if error:
         return render_admin(request, "admin/product_form.html", _product_form_context(db, product=product, error=error), db, status_code=400)
@@ -429,16 +440,26 @@ async def product_edit_submit(
             delete_product_image(img.image_url)
             db.delete(img)
 
-    max_sort = max([img.sort_order for img in product.images if img.id not in delete_image_ids], default=-1)
-    for image in images:
-        if image is not None and image.filename:
-            try:
-                url = save_product_image(image)
-            except UploadValidationError as exc:
-                db.rollback()
-                return render_admin(request, "admin/product_form.html", _product_form_context(db, product=product, error=exc.detail), db, status_code=400)
-            max_sort += 1
-            db.add(ProductImage(product_id=product.id, image_url=url, sort_order=max_sort))
+    # Reorder the images the admin kept, per drag-reorder / "Make Primary" in
+    # the form (a hidden field listing existing image IDs in the new order).
+    # Only IDs that are genuinely this product's remaining images are honored,
+    # so a tampered field can't touch another product's rows.
+    remaining_by_id = {img.id: img for img in remaining_existing}
+    ordered_ids = [int(x) for x in image_order.split(",") if x.strip().isdigit()]
+    ordered_ids = [i for i in ordered_ids if i in remaining_by_id]
+    ordered_ids += [img.id for img in remaining_existing if img.id not in ordered_ids]
+    for idx, img_id in enumerate(ordered_ids):
+        remaining_by_id[img_id].sort_order = idx
+
+    max_sort = len(ordered_ids) - 1
+    for image in uploaded_images:
+        try:
+            url = save_product_image(image)
+        except UploadValidationError as exc:
+            db.rollback()
+            return render_admin(request, "admin/product_form.html", _product_form_context(db, product=product, error=exc.detail), db, status_code=400)
+        max_sort += 1
+        db.add(ProductImage(product_id=product.id, image_url=url, sort_order=max_sort))
 
     if name != product.name:
         product.slug = unique_slug(db, Product, name, exclude_id=product.id)

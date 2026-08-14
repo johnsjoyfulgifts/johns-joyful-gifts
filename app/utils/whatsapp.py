@@ -1,6 +1,6 @@
 from urllib.parse import quote
 
-from app.models import Order
+from app.models import Order, Product
 
 
 def _digits_only(phone: str) -> str:
@@ -12,6 +12,14 @@ def whatsapp_chat_link(number: str, message: str = "") -> str:
     if message:
         return f"https://wa.me/{digits}?text={quote(message)}"
     return f"https://wa.me/{digits}"
+
+
+def product_enquiry_message(product: Product) -> str:
+    return (
+        f"Hi, I'm interested in this product: {product.name}.\n"
+        f"Product Price: ₹{product.price:.0f}\n"
+        "Please share more details."
+    )
 
 
 def order_confirmation_message(order: Order) -> str:

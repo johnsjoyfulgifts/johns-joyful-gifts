@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% import "customer/_product_card.html" as cards %}
+{% import "_whatsapp_icon.html" as wa %}
 
 {% block content %}
 <div class="container">
@@ -8,7 +9,7 @@
     <p>Toys, stationery, school bags &amp; gifts — hand-picked with care, delivered with love.</p>
     <div class="hero__actions">
       <a class="btn btn-primary" href="/shop">Shop Now</a>
-      <a class="btn btn-whatsapp" href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener">💬 Chat on WhatsApp</a>
+      <a class="btn btn-whatsapp" href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener">{{ wa.whatsapp_icon(18) }} Chat on WhatsApp</a>
     </div>
   </section>
 

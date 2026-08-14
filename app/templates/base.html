@@ -8,13 +8,14 @@
   <meta property="og:title" content="{{ store.store_name }}">
   <meta property="og:description" content="{{ store.store_tagline }}">
   <meta property="og:type" content="website">
-  <meta name="theme-color" content="#ff6f61">
+  <meta name="theme-color" content="#6B7350">
   <link rel="manifest" href="/static/manifest.json">
   <link rel="icon" href="/static/icons/favicon.png">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/static/css/style.css">
   {% block extra_head %}{% endblock %}
 </head>
+{% import "_whatsapp_icon.html" as wa %}
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
 
@@ -32,7 +33,7 @@
         </form>
       </div>
       <div class="header-actions">
-        <a class="icon-link" href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">💬</a>
+        <a class="icon-link" href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">{{ wa.whatsapp_icon(20) }}</a>
         {% if current_customer %}
         <a class="icon-link" href="/account" aria-label="My Account, {{ current_customer.name }}">👤</a>
         {% else %}
@@ -58,7 +59,7 @@
     {% block content %}{% endblock %}
   </main>
 
-  <a class="whatsapp-float" href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener" aria-label="Chat with us on WhatsApp">💬</a>
+  <a class="whatsapp-float" href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener" aria-label="Chat with us on WhatsApp">{{ wa.whatsapp_icon(22) }}<span class="whatsapp-float__label">WhatsApp</span></a>
 
   <footer class="site-footer">
     <div class="container">
@@ -67,7 +68,7 @@
           <h4>{{ store.store_name }}</h4>
           <p style="opacity:0.85; font-size:0.85rem;">{{ store.store_tagline }}</p>
           <ul>
-            <li><a href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener">💬 WhatsApp Us</a></li>
+            <li><a href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;">{{ wa.whatsapp_icon(16) }} WhatsApp Us</a></li>
             <li><a href="{{ store.instagram_url }}" target="_blank" rel="noopener">📷 Instagram</a></li>
           </ul>
         </div>

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_whatsapp_icon.html" as wa %}
 {% block title %}Order Placed — {{ store.store_name }}{% endblock %}
 
 {% block content %}
@@ -42,7 +43,7 @@
   {% endif %}
 
   <div class="hero__actions">
-    <a class="btn btn-whatsapp" href="{{ whatsapp_share_link }}" target="_blank" rel="noopener">💬 Send Order Details on WhatsApp</a>
+    <a class="btn btn-whatsapp" href="{{ whatsapp_share_link }}" target="_blank" rel="noopener">{{ wa.whatsapp_icon(18) }} Send Order Details on WhatsApp</a>
     <a class="btn btn-secondary" href="/track-order?order_number={{ order.order_number }}">Track This Order</a>
     <a class="btn btn-outline" href="/shop">Continue Shopping</a>
   </div>

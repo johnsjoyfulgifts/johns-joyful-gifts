@@ -169,6 +169,8 @@ def search(request: Request, q: str = "", page: int = 1, db: Session = Depends(g
 
 @router.get("/product/{slug}")
 def product_detail(slug: str, request: Request, db: Session = Depends(get_db)):
+    from app.utils.whatsapp import product_enquiry_message, whatsapp_chat_link
+
     product = (
         db.query(Product)
         .options(joinedload(Product.images), joinedload(Product.category))
@@ -186,7 +188,15 @@ def product_detail(slug: str, request: Request, db: Session = Depends(get_db)):
         .all()
     )
 
-    return render(request, "customer/product_detail.html", {"product": product, "related": related}, db)
+    whatsapp_number = get_all_settings(db).get("whatsapp_number", "")
+    product_whatsapp_link = whatsapp_chat_link(whatsapp_number, product_enquiry_message(product))
+
+    return render(
+        request,
+        "customer/product_detail.html",
+        {"product": product, "related": related, "product_whatsapp_link": product_whatsapp_link},
+        db,
+    )
 
 
 @router.get("/about")
