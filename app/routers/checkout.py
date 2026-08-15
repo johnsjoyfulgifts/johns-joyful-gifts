@@ -121,6 +121,11 @@ async def api_checkout(
             if isinstance(exc, ValidationError) and exc.errors()
             else "Please check the information you entered."
         )
+        # Pydantic v2 prefixes a field_validator's raised ValueError with its
+        # own "Value error, " wrapper — strip that so the customer sees only
+        # the message we actually wrote.
+        if message.startswith("Value error, "):
+            message = message[len("Value error, "):]
         return JSONResponse({"detail": message}, status_code=422)
 
     # Never trust the client's claim that manual payment is configured —

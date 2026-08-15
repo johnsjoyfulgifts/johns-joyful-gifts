@@ -24,10 +24,11 @@ class CheckoutRequest(BaseModel):
 
     @field_validator("address", "city", "state")
     @classmethod
-    def not_blank(cls, value: str) -> str:
+    def not_blank(cls, value: str, info) -> str:
         value = value.strip()
         if not value:
-            raise ValueError("This field is required.")
+            field_names = {"address": "address", "city": "city", "state": "state"}
+            raise ValueError(f"Please enter your {field_names.get(info.field_name, info.field_name)}.")
         return value
 
     @field_validator("pincode")

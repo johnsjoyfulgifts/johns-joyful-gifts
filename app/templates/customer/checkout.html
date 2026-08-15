@@ -211,6 +211,15 @@
 
   form.addEventListener('submit', async function (event) {
     event.preventDefault();
+    // The form has novalidate (we submit via fetch, not a real page
+    // navigation), so the browser's built-in "please fill this out" check
+    // never runs on its own — ask for it explicitly. This is what actually
+    // points the customer at the one empty field (state, most often, since
+    // browser autofill frequently skips it) instead of a vague banner.
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
     if (btn.disabled) return; // duplicate-submission lock
     btn.disabled = true;
     btn.textContent = 'Placing your order...';
