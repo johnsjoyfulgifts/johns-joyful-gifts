@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app.models import Order
 from app.rate_limit import is_rate_limited
-from app.schemas import TrackOrderRequest
+from app.schemas import TrackOrderRequest, normalize_mobile
 from app.templating import render
 
 router = APIRouter()
@@ -32,7 +32,7 @@ async def api_track_order(request: Request, db: Session = Depends(get_db)):
         return JSONResponse({"detail": "Please enter a valid order ID and mobile number."}, status_code=422)
 
     order_number = data.order_number.strip()
-    mobile = data.mobile.strip()
+    mobile = normalize_mobile(data.mobile.strip())
 
     order = (
         db.query(Order)
@@ -44,7 +44,7 @@ async def api_track_order(request: Request, db: Session = Depends(get_db)):
     # Same generic message whether the order number is wrong or the mobile
     # number doesn't match — never confirm that an order number exists to
     # someone who doesn't also know the mobile number on it.
-    if order is None or order.customer.mobile.strip() != mobile:
+    if order is None or normalize_mobile(order.customer.mobile) != mobile:
         return JSONResponse({"detail": GENERIC_NOT_FOUND}, status_code=404)
 
     return JSONResponse(

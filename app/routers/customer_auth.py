@@ -13,7 +13,7 @@ from app.customer_auth import (
 from app.database import get_db
 from app.models import Customer, Order
 from app.rate_limit import is_rate_limited
-from app.schemas import MOBILE_RE
+from app.schemas import MOBILE_RE, normalize_mobile
 from app.templating import render
 
 router = APIRouter()
@@ -53,12 +53,20 @@ def register_submit(
         error = "Please enter your name."
     elif not MOBILE_RE.match(mobile):
         error = "Please enter a valid mobile number."
-    elif len(password) < 8:
-        error = "Password must be at least 8 characters."
-    elif password != confirm_password:
-        error = "Passwords didn't match."
-    elif db.query(Customer).filter(Customer.mobile == mobile).first() is not None:
-        error = "An account with this mobile number already exists. Please log in instead."
+    else:
+        # Normalize before storing/checking, or a customer who later logs in
+        # (or tracks an order) typing the same real number differently —
+        # with/without +91, with/without a leading 0 — would silently fail
+        # to match their own account.
+        mobile = normalize_mobile(mobile)
+        if len(mobile) != 10:
+            error = "Please enter a valid 10-digit mobile number."
+        elif len(password) < 8:
+            error = "Password must be at least 8 characters."
+        elif password != confirm_password:
+            error = "Passwords didn't match."
+        elif db.query(Customer).filter(Customer.mobile == mobile).first() is not None:
+            error = "An account with this mobile number already exists. Please log in instead."
 
     if error:
         return render(
@@ -103,7 +111,7 @@ def login_submit(
             status_code=429,
         )
 
-    customer = db.query(Customer).filter(Customer.mobile == mobile.strip()).first()
+    customer = db.query(Customer).filter(Customer.mobile == normalize_mobile(mobile.strip())).first()
     if customer is None or not verify_password(password, customer.password_hash):
         return render(
             request,

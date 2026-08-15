@@ -6,6 +6,17 @@ MOBILE_RE = re.compile(r"^[0-9+][0-9\-\s]{7,17}$")
 PINCODE_RE = re.compile(r"^[0-9]{4,10}$")
 
 
+def normalize_mobile(value: str) -> str:
+    """India-only: keep just the digits, then only the last 10 of them — so
+    '+917449111705', '917449111705', '07449111705' and '7449111705' all
+    collapse to the same value, regardless of whether the country code (or
+    a leading 0) was typed. Every place that stores or looks up a customer's
+    mobile number must normalize through this, or two logins/lookups for
+    the same real number can silently fail to match each other."""
+    digits = "".join(ch for ch in value if ch.isdigit())
+    return digits[-10:] if len(digits) > 10 else digits
+
+
 class CheckoutRequest(BaseModel):
     """Name/mobile are NOT collected here — checkout requires a logged-in
     customer, so those come from the account (Customer.name/mobile)."""
