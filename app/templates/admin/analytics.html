@@ -3,44 +3,52 @@
 {% block page_title %}Product Analytics{% endblock %}
 
 {% block admin_content %}
-<div class="flex gap-8" style="margin-bottom:14px;">
-  {% for p in periods %}
-  <a class="btn btn-sm {{ 'btn-primary' if days == p else 'btn-secondary' }}" href="/admin/analytics?days={{ p }}">Last {{ p }} days</a>
-  {% endfor %}
+<div class="flex justify-between items-center" style="margin-bottom:18px; flex-wrap:wrap; gap:10px;">
+  <span class="text-muted" style="font-size:0.85rem;">Views, WhatsApp enquiries, and add-to-cart taps — aggregate counts only, no visitor tracking.</span>
+  <div class="segmented">
+    {% for p in periods %}
+    <a href="/admin/analytics?days={{ p }}" class="{{ 'active' if days == p }}">{{ p }}d</a>
+    {% endfor %}
+  </div>
 </div>
 
-<div class="flex gap-12" style="flex-wrap:wrap; margin-bottom:20px;">
-  <div class="card" style="flex:1; min-width:140px;">
-    <p class="text-muted" style="margin:0; font-size:0.8rem;">Product Views</p>
-    <p style="font-size:1.6rem; font-weight:700; margin:4px 0 0;">{{ totals.view }}</p>
-  </div>
-  <div class="card" style="flex:1; min-width:140px;">
-    <p class="text-muted" style="margin:0; font-size:0.8rem;">WhatsApp Enquiries</p>
-    <p style="font-size:1.6rem; font-weight:700; margin:4px 0 0;">{{ totals.enquiry }}</p>
-  </div>
-  <div class="card" style="flex:1; min-width:140px;">
-    <p class="text-muted" style="margin:0; font-size:0.8rem;">Add to Cart</p>
-    <p style="font-size:1.6rem; font-weight:700; margin:4px 0 0;">{{ totals.add_to_cart }}</p>
-  </div>
+<div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+  <div class="stat-card stat-card--info"><div class="stat-card__icon">👁️</div><div class="stat-card__value">{{ totals.view }}</div><div class="stat-card__label">Product Views</div></div>
+  <div class="stat-card"><div class="stat-card__icon">💬</div><div class="stat-card__value">{{ totals.enquiry }}</div><div class="stat-card__label">WhatsApp Enquiries</div></div>
+  <div class="stat-card stat-card--success"><div class="stat-card__icon">🛒</div><div class="stat-card__value">{{ totals.add_to_cart }}</div><div class="stat-card__label">Add to Cart</div></div>
 </div>
 
 {% if breakdown %}
-<div class="admin-table-wrap">
-  <table class="admin-table">
-    <thead><tr><th>Product</th><th>Views</th><th>Enquiries</th><th>Add to Cart</th></tr></thead>
-    <tbody>
-      {% for row in breakdown %}
-      <tr>
-        <td><a href="/admin/products/{{ row.product.id }}/edit">{{ row.product.name }}</a></td>
-        <td>{{ row.view }}</td>
-        <td>{{ row.enquiry }}</td>
-        <td>{{ row.add_to_cart }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="card" style="margin-top:20px;">
+  <div class="flex justify-between items-center" style="margin-bottom:8px;">
+    <h2 style="font-size:1rem; margin:0;">Per-Product Breakdown</h2>
+    <div class="flex gap-12" style="flex-wrap:wrap;">
+      <span class="bar-line"><span class="bar-line__swatch bar-line__swatch--view"></span>Views</span>
+      <span class="bar-line"><span class="bar-line__swatch bar-line__swatch--enquiry"></span>Enquiries</span>
+      <span class="bar-line"><span class="bar-line__swatch bar-line__swatch--cart"></span>Cart</span>
+    </div>
+  </div>
+  {% for row in breakdown %}
+  <div class="bar-row">
+    <div class="bar-row__label"><a href="/admin/products/{{ row.product.id }}/edit">{{ row.product.name }}</a></div>
+    <div class="bar-row__metrics">
+      <span class="bar-line">
+        <span class="bar-track"><span class="bar-fill" style="width: {{ (row.view / max_metric * 100)|round(1) }}%;"></span></span>
+        <strong>{{ row.view }}</strong>
+      </span>
+      <span class="bar-line">
+        <span class="bar-track"><span class="bar-fill bar-fill--enquiry" style="width: {{ (row.enquiry / max_metric * 100)|round(1) }}%;"></span></span>
+        <strong>{{ row.enquiry }}</strong>
+      </span>
+      <span class="bar-line">
+        <span class="bar-track"><span class="bar-fill bar-fill--cart" style="width: {{ (row.add_to_cart / max_metric * 100)|round(1) }}%;"></span></span>
+        <strong>{{ row.add_to_cart }}</strong>
+      </span>
+    </div>
+  </div>
+  {% endfor %}
 </div>
 {% else %}
-<div class="empty-state"><h3>No activity yet in this period.</h3><p>Views, WhatsApp enquiries, and add-to-cart taps will show up here as customers browse.</p></div>
+<div class="empty-state" style="margin-top:20px;"><h3>No activity yet in this period.</h3><p>Views, WhatsApp enquiries, and add-to-cart taps will show up here as customers browse.</p></div>
 {% endif %}
 {% endblock %}

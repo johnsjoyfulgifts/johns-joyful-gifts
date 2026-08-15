@@ -8,51 +8,63 @@
 {% set is_product = is_super or role == 'product_manager' %}
 {% set is_order = is_super or role == 'order_enquiry_manager' %}
 
-{% if is_order %}
-<div class="stat-grid">
-  <div class="stat-card"><div class="stat-card__value">{{ total_orders }}</div><div class="stat-card__label">Total Orders</div></div>
-  <div class="stat-card"><div class="stat-card__value">{{ new_order_count }}</div><div class="stat-card__label">New (Unviewed)</div></div>
-  <div class="stat-card"><div class="stat-card__value">{{ processing_count }}</div><div class="stat-card__label">Processing</div></div>
-  <div class="stat-card"><div class="stat-card__value">{{ shipped_count }}</div><div class="stat-card__label">Shipped</div></div>
-  <div class="stat-card"><div class="stat-card__value">{{ delivered_count }}</div><div class="stat-card__label">Delivered</div></div>
-  <div class="stat-card"><div class="stat-card__value">{{ cancelled_count }}</div><div class="stat-card__label">Cancelled</div></div>
+<div class="dashboard-hero">
+  <div>
+    <h1>Welcome back{{ ', ' + current_admin.name.split(' ')[0] if current_admin else '' }} 👋</h1>
+    <p>{{ store.store_name }} · here's what's happening today</p>
+  </div>
+  <span class="dashboard-hero__badge">{{ current_year }}</span>
 </div>
 
-<div class="card" style="margin-top:16px;">
-  <div class="stat-card__label">Total Sales (excl. cancelled)</div>
-  <div class="stat-card__value" style="font-size:1.8rem;">₹{{ "%.0f"|format(total_sales) }}</div>
+{% if is_order %}
+<div class="admin-section-heading">📦 Orders</div>
+<div class="stat-grid">
+  <div class="stat-card stat-card--info"><div class="stat-card__icon">📦</div><div class="stat-card__value">{{ total_orders }}</div><div class="stat-card__label">Total Orders</div></div>
+  <div class="stat-card stat-card--warning"><div class="stat-card__icon">🆕</div><div class="stat-card__value">{{ new_order_count }}</div><div class="stat-card__label">New (Unviewed)</div></div>
+  <div class="stat-card"><div class="stat-card__icon">⚙️</div><div class="stat-card__value">{{ processing_count }}</div><div class="stat-card__label">Processing</div></div>
+  <div class="stat-card"><div class="stat-card__icon">🚚</div><div class="stat-card__value">{{ shipped_count }}</div><div class="stat-card__label">Shipped</div></div>
+  <div class="stat-card stat-card--success"><div class="stat-card__icon">✅</div><div class="stat-card__value">{{ delivered_count }}</div><div class="stat-card__label">Delivered</div></div>
+  <div class="stat-card stat-card--danger"><div class="stat-card__icon">✕</div><div class="stat-card__value">{{ cancelled_count }}</div><div class="stat-card__label">Cancelled</div></div>
+</div>
+
+<div class="card" style="margin-top:14px; display:flex; align-items:center; gap:16px;">
+  <div class="stat-card__icon" style="background:rgba(46,125,50,0.12); font-size:1.3rem; width:48px; height:48px;">💰</div>
+  <div>
+    <div class="stat-card__label" style="margin:0;">Total Sales (excl. cancelled)</div>
+    <div class="stat-card__value" style="font-size:2rem;">₹{{ "%.0f"|format(total_sales) }}</div>
+  </div>
 </div>
 {% endif %}
 
 {% if is_product %}
-<h2 style="font-size:1rem; margin:20px 0 10px;">Products</h2>
+<div class="admin-section-heading">🧸 Products</div>
 <div class="stat-grid">
-  <div class="stat-card"><div class="stat-card__value">{{ total_products }}</div><div class="stat-card__label">Total Products</div></div>
-  <div class="stat-card"><div class="stat-card__value">{{ active_products }}</div><div class="stat-card__label">Active Products</div></div>
-  <div class="stat-card"><div class="stat-card__value">{{ out_of_stock_count }}</div><div class="stat-card__label">Out of Stock</div></div>
-  <div class="stat-card"><div class="stat-card__value">{{ low_stock_count }}</div><div class="stat-card__label">Low Stock</div></div>
-  <div class="stat-card"><div class="stat-card__value">{{ featured_count }}</div><div class="stat-card__label">Featured</div></div>
-  <div class="stat-card"><div class="stat-card__value">{{ sale_count }}</div><div class="stat-card__label">On Sale</div></div>
-  <div class="stat-card"><div class="stat-card__value">{{ new_arrival_count }}</div><div class="stat-card__label">New Arrivals</div></div>
+  <div class="stat-card stat-card--info"><div class="stat-card__icon">🧸</div><div class="stat-card__value">{{ total_products }}</div><div class="stat-card__label">Total Products</div></div>
+  <div class="stat-card stat-card--success"><div class="stat-card__icon">✅</div><div class="stat-card__value">{{ active_products }}</div><div class="stat-card__label">Active Products</div></div>
+  <div class="stat-card stat-card--danger"><div class="stat-card__icon">⚠️</div><div class="stat-card__value">{{ out_of_stock_count }}</div><div class="stat-card__label">Out of Stock</div></div>
+  <div class="stat-card stat-card--warning"><div class="stat-card__icon">📉</div><div class="stat-card__value">{{ low_stock_count }}</div><div class="stat-card__label">Low Stock</div></div>
+  <div class="stat-card stat-card--accent"><div class="stat-card__icon">🌟</div><div class="stat-card__value">{{ featured_count }}</div><div class="stat-card__label">Featured</div></div>
+  <div class="stat-card stat-card--accent"><div class="stat-card__icon">🏷️</div><div class="stat-card__value">{{ sale_count }}</div><div class="stat-card__label">On Sale</div></div>
+  <div class="stat-card"><div class="stat-card__icon">✨</div><div class="stat-card__value">{{ new_arrival_count }}</div><div class="stat-card__label">New Arrivals</div></div>
   {% if pending_review_count %}
-  <div class="stat-card"><div class="stat-card__value">{{ pending_review_count }}</div><div class="stat-card__label">Reviews Pending</div></div>
+  <div class="stat-card stat-card--warning"><div class="stat-card__icon">⭐</div><div class="stat-card__value">{{ pending_review_count }}</div><div class="stat-card__label">Reviews Pending</div></div>
   {% endif %}
 </div>
 {% endif %}
 
 {% if is_order %}
-<h2 style="font-size:1rem; margin:20px 0 10px;">Sales Documents</h2>
+<div class="admin-section-heading">📋 Sales Documents</div>
 <div class="stat-grid">
-  <div class="stat-card"><div class="stat-card__value">{{ new_enquiry_count }}</div><div class="stat-card__label">New Enquiries</div></div>
-  <div class="stat-card"><div class="stat-card__value">{{ open_quotation_count }}</div><div class="stat-card__label">Open Quotations</div></div>
-  <div class="stat-card"><div class="stat-card__value">{{ unpaid_invoice_count }}</div><div class="stat-card__label">Unpaid Invoices</div></div>
-  <div class="stat-card"><div class="stat-card__value">₹{{ "%.0f"|format(unpaid_invoice_total) }}</div><div class="stat-card__label">Outstanding Balance</div></div>
+  <div class="stat-card stat-card--info"><div class="stat-card__icon">💬</div><div class="stat-card__value">{{ new_enquiry_count }}</div><div class="stat-card__label">New Enquiries</div></div>
+  <div class="stat-card stat-card--accent"><div class="stat-card__icon">📋</div><div class="stat-card__value">{{ open_quotation_count }}</div><div class="stat-card__label">Open Quotations</div></div>
+  <div class="stat-card stat-card--warning"><div class="stat-card__icon">🧾</div><div class="stat-card__value">{{ unpaid_invoice_count }}</div><div class="stat-card__label">Unpaid Invoices</div></div>
+  <div class="stat-card stat-card--danger"><div class="stat-card__icon">₹</div><div class="stat-card__value">₹{{ "%.0f"|format(unpaid_invoice_total) }}</div><div class="stat-card__label">Outstanding Balance</div></div>
 </div>
 {% endif %}
 
 {% if is_product and (out_of_stock_count > 0 or low_stock) %}
-<div class="card" style="margin-top:16px;">
-  <h2 style="font-size:1rem; margin-top:0;">Stock Alerts</h2>
+<div class="card" style="margin-top:20px;">
+  <h2 style="font-size:1rem; margin-top:0; display:flex; align-items:center; gap:8px;">⚠️ Stock Alerts</h2>
   {% if out_of_stock_count > 0 %}<p class="badge badge--danger">{{ out_of_stock_count }} product(s) out of stock</p>{% endif %}
   {% if low_stock %}
   <div class="admin-table-wrap" style="margin-top:10px;">
@@ -60,7 +72,7 @@
       <thead><tr><th>Product</th><th>Stock Left</th></tr></thead>
       <tbody>
         {% for p in low_stock %}
-        <tr><td><a href="/admin/products/{{ p.id }}/edit">{{ p.name }}</a></td><td>{{ p.stock }}</td></tr>
+        <tr><td><a href="/admin/products/{{ p.id }}/edit">{{ p.name }}</a></td><td><span class="badge badge--warning">{{ p.stock }}</span></td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -70,10 +82,10 @@
 {% endif %}
 
 {% if is_order %}
-<div class="card" style="margin-top:16px;">
+<div class="card" style="margin-top:20px;">
   <div class="flex justify-between items-center">
-    <h2 style="font-size:1rem; margin:0;">Recent Orders</h2>
-    <a href="/admin/orders" style="font-size:0.85rem;">View all</a>
+    <h2 style="font-size:1rem; margin:0; display:flex; align-items:center; gap:8px;">📦 Recent Orders</h2>
+    <a href="/admin/orders" style="font-size:0.85rem;">View all →</a>
   </div>
 
   {% if recent_orders %}
@@ -110,8 +122,8 @@
 {% endif %}
 
 {% if is_product and recent_products %}
-<div class="card" style="margin-top:16px;">
-  <h2 style="font-size:1rem; margin-top:0;">Recent Activity</h2>
+<div class="card" style="margin-top:20px;">
+  <h2 style="font-size:1rem; margin-top:0; display:flex; align-items:center; gap:8px;">🕒 Recent Activity</h2>
   <ul class="timeline">
     {% for p in recent_products %}
     <li class="done">

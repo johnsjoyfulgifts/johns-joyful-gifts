@@ -1091,6 +1091,12 @@ def analytics_page(request: Request, days: int = 30, db: Session = Depends(get_d
         breakdown.append({"product": product, **counts, "total": sum(counts.values())})
     breakdown.sort(key=lambda row: row["total"], reverse=True)
 
+    # Bar widths are relative to the busiest product for that same metric,
+    # so rows are visually comparable to each other rather than each bar
+    # being self-normalized (which would make a 1-view product look as
+    # "full" as a 100-view one).
+    max_metric = max([max(row["view"], row["enquiry"], row["add_to_cart"]) for row in breakdown], default=0) or 1
+
     return render_admin(
         request,
         "admin/analytics.html",
@@ -1100,6 +1106,7 @@ def analytics_page(request: Request, days: int = 30, db: Session = Depends(get_d
             "periods": ANALYTICS_PERIODS,
             "breakdown": breakdown,
             "totals": totals,
+            "max_metric": max_metric,
         },
         db,
     )
