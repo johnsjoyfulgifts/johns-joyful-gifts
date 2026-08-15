@@ -4,9 +4,12 @@
 
 {% block content %}
 <div class="container page-section">
-  <h1 class="section-title">
-    {% if query %}Search results for "{{ query }}"{% else %}Search{% endif %}
-  </h1>
+  <div class="shop-header">
+    <h1 class="section-title">
+      {% if query %}Search results for "{{ query }}"{% else %}Search{% endif %}
+    </h1>
+    {% if query and products %}<span class="results-count"><strong>{{ total }}</strong> result{{ 's' if total != 1 }}</span>{% endif %}
+  </div>
 
   {% if not query %}
   <div class="empty-state">
@@ -15,7 +18,6 @@
     <p>Try searching for toys, stationery, school bags, or gifts.</p>
   </div>
   {% elif products %}
-  <p class="text-muted">{{ total }} result{{ 's' if total != 1 }} found</p>
   <div class="product-grid">
     {% for p in products %}{{ cards.product_card(p) }}{% endfor %}
   </div>
