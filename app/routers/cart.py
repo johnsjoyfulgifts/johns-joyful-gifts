@@ -10,6 +10,7 @@ from app.cart_service import (
     read_cart,
     write_cart,
 )
+from app.customer_auth import get_current_customer
 from app.database import get_db
 from app.models import Product
 from app.settings_service import compute_delivery_charge, get_all_settings
@@ -33,8 +34,18 @@ def cart_page(request: Request, db: Session = Depends(get_db)):
 
     cart_whatsapp_link = None
     if lines:
-        whatsapp_number = get_all_settings(db).get("whatsapp_number", "")
-        cart_whatsapp_link = whatsapp_chat_link(whatsapp_number, cart_enquiry_message(lines, subtotal, total))
+        store_values = get_all_settings(db)
+        current_customer = get_current_customer(request, db)
+        cart_whatsapp_link = whatsapp_chat_link(
+            store_values.get("whatsapp_number", ""),
+            cart_enquiry_message(
+                lines,
+                subtotal,
+                total,
+                template=store_values.get("whatsapp_cart_template", ""),
+                customer_name=current_customer.name if current_customer else "",
+            ),
+        )
 
     return render(
         request,
@@ -72,7 +83,7 @@ def api_add_to_cart(
     db: Session = Depends(get_db),
 ):
     product = db.get(Product, product_id)
-    if product is None or not product.active:
+    if product is None or not product.active or product.deleted_at is not None:
         return JSONResponse({"detail": "This product is no longer available."}, status_code=404)
     if product.stock <= 0:
         return JSONResponse({"detail": "This product is out of stock."}, status_code=400)

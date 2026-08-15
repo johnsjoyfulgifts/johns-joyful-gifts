@@ -14,24 +14,53 @@ def whatsapp_chat_link(number: str, message: str = "") -> str:
     return f"https://wa.me/{digits}"
 
 
-def product_enquiry_message(product: Product) -> str:
-    return (
-        f"Hi, I'm interested in this product: {product.name}.\n"
-        f"Product Price: ₹{product.price:.0f}\n"
-        "Please share more details."
+DEFAULT_PRODUCT_TEMPLATE = (
+    "Hi, I'm interested in this product: [PRODUCT_NAME] (SKU: [SKU]).\n"
+    "Price: ₹[PRICE]\n"
+    "Quantity: [QUANTITY]\n"
+    "Please share more details."
+)
+
+DEFAULT_CART_TEMPLATE = (
+    "Hi, I'd like to order the following:\n\n"
+    "[CART_ITEMS]\n\n"
+    "Cart Total: ₹[CART_TOTAL]\n\n"
+    "Please confirm availability and delivery details."
+)
+
+
+def render_whatsapp_template(template: str, **values) -> str:
+    """Fills [PLACEHOLDER] tokens with the given values (missing ones become
+    blank). The result still lands as pre-filled, editable text in the
+    customer's WhatsApp compose box — nothing here is ever sent automatically."""
+    result = template
+    for key, value in values.items():
+        result = result.replace(f"[{key}]", str(value) if value is not None else "")
+    return result
+
+
+def product_enquiry_message(product: Product, template: str = "", quantity: int = 1, customer_name: str = "") -> str:
+    return render_whatsapp_template(
+        template or DEFAULT_PRODUCT_TEMPLATE,
+        PRODUCT_NAME=product.name,
+        SKU=product.sku or "",
+        PRICE=f"{product.price:.0f}",
+        QUANTITY=quantity,
+        CART_TOTAL=f"{product.price * quantity:.0f}",
+        CUSTOMER_NAME=customer_name,
     )
 
 
-def cart_enquiry_message(lines, subtotal: float, total: float) -> str:
-    parts = ["Hi, I'd like to order the following:", ""]
-    for line in lines:
-        parts.append(f"- {line.product.name} x{line.quantity} @ ₹{line.product.price:.0f} = ₹{line.subtotal:.0f}")
-    parts.append("")
-    parts.append(f"Subtotal: ₹{subtotal:.0f}")
-    parts.append(f"Cart Total: ₹{total:.0f}")
-    parts.append("")
-    parts.append("Please confirm availability and delivery details.")
-    return "\n".join(parts)
+def cart_enquiry_message(lines, subtotal: float, total: float, template: str = "", customer_name: str = "") -> str:
+    items_text = "\n".join(f"- {line.product.name} x{line.quantity} @ ₹{line.product.price:.0f} = ₹{line.subtotal:.0f}" for line in lines)
+    total_quantity = sum(line.quantity for line in lines)
+    return render_whatsapp_template(
+        template or DEFAULT_CART_TEMPLATE,
+        CART_ITEMS=items_text,
+        QUANTITY=total_quantity,
+        CART_TOTAL=f"{total:.0f}",
+        CUSTOMER_NAME=customer_name,
+    )
 
 
 def order_confirmation_message(order: Order) -> str:

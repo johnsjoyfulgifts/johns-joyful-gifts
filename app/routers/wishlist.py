@@ -57,5 +57,5 @@ def wishlist_page(request: Request, db: Session = Depends(get_db), customer: Cus
         .order_by(Wishlist.created_at.desc())
         .all()
     )
-    products = [w.product for w in items if w.product is not None and w.product.active]
+    products = [w.product for w in items if w.product is not None and w.product.active and w.product.deleted_at is None]
     return render(request, "customer/wishlist.html", {"products": products}, db)

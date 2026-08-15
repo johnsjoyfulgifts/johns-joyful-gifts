@@ -105,7 +105,7 @@ def lines_for_cart(raw_cart: dict[str, int], db: Session) -> list[CartLine]:
     lines: list[CartLine] = []
     for pid_str, qty in raw_cart.items():
         product = products_by_id.get(int(pid_str))
-        if product is None or not product.active:
+        if product is None or not product.active or product.deleted_at is not None:
             continue
         capped_qty = min(qty, product.stock) if product.stock > 0 else qty
         lines.append(CartLine(product, capped_qty))

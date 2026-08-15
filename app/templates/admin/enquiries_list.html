@@ -1,0 +1,68 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}WhatsApp Enquiries — Admin{% endblock %}
+{% block page_title %}WhatsApp Enquiries{% endblock %}
+
+{% block admin_content %}
+<div class="flex justify-between items-center" style="margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+  <span class="text-muted">{{ enquiries|length }} enquir{{ 'y' if enquiries|length == 1 else 'ies' }}</span>
+  <a class="btn btn-primary btn-sm" href="/admin/enquiries/new">+ Log Enquiry</a>
+</div>
+
+<form class="filter-bar" method="get">
+  <select name="status" onchange="this.form.submit()">
+    <option value="" {{ 'selected' if not status }}>All Status</option>
+    {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if status == s }}>{{ s }}</option>{% endfor %}
+  </select>
+</form>
+
+{% if enquiries %}
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead><tr><th>Date</th><th>Customer</th><th>Phone</th><th>Product</th><th>Qty</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for e in enquiries %}
+      <tr>
+        <td class="text-muted" style="white-space:nowrap;">{{ e.created_at.strftime('%d %b %Y') if e.created_at else '—' }}</td>
+        <td>{{ e.customer_name }}</td>
+        <td>{{ e.customer_phone }}</td>
+        <td class="text-muted">{{ e.product.name if e.product else '—' }}</td>
+        <td>{{ e.quantity or '—' }}</td>
+        <td>
+          {% if e.status == 'New' %}<span class="badge badge--warning">New</span>
+          {% elif e.status == 'Cancelled' %}<span class="badge badge--danger">Cancelled</span>
+          {% elif e.status == 'Completed' %}<span class="badge badge--success">Completed</span>
+          {% else %}<span class="badge badge--muted">{{ e.status }}</span>{% endif %}
+        </td>
+        <td>
+          <a class="btn btn-sm btn-secondary" href="/admin/enquiries/{{ e.id }}/edit">Edit</a>
+          <form method="post" action="/admin/enquiries/{{ e.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this enquiry record?');"><button type="submit" class="btn btn-sm btn-danger">Delete</button></form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="admin-card-list">
+  {% for e in enquiries %}
+  <div class="admin-record-card">
+    <div class="flex justify-between items-center">
+      <strong>{{ e.customer_name }}</strong>
+      {% if e.status == 'New' %}<span class="badge badge--warning">New</span>
+      {% elif e.status == 'Cancelled' %}<span class="badge badge--danger">Cancelled</span>
+      {% elif e.status == 'Completed' %}<span class="badge badge--success">Completed</span>
+      {% else %}<span class="badge badge--muted">{{ e.status }}</span>{% endif %}
+    </div>
+    <div class="text-muted" style="font-size:0.85rem; margin:4px 0;">{{ e.customer_phone }} · {{ e.product.name if e.product else 'No product' }}{{ ' × ' + e.quantity|string if e.quantity }}</div>
+    <div class="flex gap-8" style="margin-top:10px;">
+      <a class="btn btn-sm btn-secondary" href="/admin/enquiries/{{ e.id }}/edit">Edit</a>
+      <form method="post" action="/admin/enquiries/{{ e.id }}/delete" onsubmit="return confirm('Delete this enquiry record?');"><button type="submit" class="btn btn-sm btn-danger">Delete</button></form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state"><h3>No enquiries logged.</h3><p>Log customer enquiries you receive over WhatsApp here to track and follow up on them.</p></div>
+{% endif %}
+{% endblock %}

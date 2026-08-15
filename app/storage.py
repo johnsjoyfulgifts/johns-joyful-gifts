@@ -25,6 +25,7 @@ ALLOWED_CONTENT_TYPES = {
 }
 CONTENT_TYPE_FOR_EXT = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
 MAX_DIMENSION = 2000  # px, longest side — large phone photos get downscaled
+THUMBNAIL_DIMENSION = 400  # px, longest side — used everywhere but the product detail hero/gallery
 
 
 class UploadValidationError(HTTPException):
@@ -37,8 +38,30 @@ def _client():
     return create_client(settings.supabase_url, settings.supabase_service_key)
 
 
-def save_product_image(upload: UploadFile) -> str:
-    """Validates and uploads a product image to Supabase Storage. Returns its public URL."""
+def _encode(image: Image.Image, save_format: str, quality: int) -> bytes:
+    if save_format == "JPEG" and image.mode != "RGB":
+        image = image.convert("RGB")
+    save_kwargs = {"quality": quality} if save_format == "JPEG" else {}
+    buffer = io.BytesIO()
+    try:
+        image.save(buffer, format=save_format, **save_kwargs)
+    except (OSError, KeyError):
+        raise UploadValidationError("We couldn't save this image. Please try a different file.")
+    return buffer.getvalue()
+
+
+def _upload(filename: str, data: bytes, content_type: str) -> str:
+    try:
+        _client().storage.from_(BUCKET).upload(filename, data, {"content-type": content_type})
+    except Exception:
+        raise UploadValidationError("We couldn't upload this image. Please try again.")
+    return _client().storage.from_(BUCKET).get_public_url(filename)
+
+
+def save_product_image(upload: UploadFile) -> tuple[str, str]:
+    """Validates and uploads a product image (plus a smaller thumbnail, used
+    everywhere except the product detail hero/gallery) to Supabase Storage.
+    Returns (image_url, thumbnail_url)."""
     if upload.content_type not in ALLOWED_CONTENT_TYPES:
         raise UploadValidationError("Please upload a JPG, PNG, or WEBP image.")
 
@@ -62,36 +85,27 @@ def save_product_image(upload: UploadFile) -> str:
         image.thumbnail((MAX_DIMENSION, MAX_DIMENSION))
 
     ext = ALLOWED_CONTENT_TYPES[upload.content_type]
-    filename = f"{uuid.uuid4().hex}.{ext}"
-
     save_format = "JPEG" if ext == "jpg" else ext.upper()
-    if save_format == "JPEG" and image.mode != "RGB":
-        image = image.convert("RGB")
-    save_kwargs = {"quality": 85} if save_format == "JPEG" else {}
+    content_type = CONTENT_TYPE_FOR_EXT[ext]
 
-    buffer = io.BytesIO()
-    try:
-        image.save(buffer, format=save_format, **save_kwargs)
-    except (OSError, KeyError):
-        raise UploadValidationError("We couldn't save this image. Please try a different file.")
+    stem = uuid.uuid4().hex
+    image_url = _upload(f"{stem}.{ext}", _encode(image, save_format, quality=85), content_type)
 
-    try:
-        _client().storage.from_(BUCKET).upload(
-            filename,
-            buffer.getvalue(),
-            {"content-type": CONTENT_TYPE_FOR_EXT[ext]},
-        )
-    except Exception:
-        raise UploadValidationError("We couldn't upload this image. Please try again.")
+    thumb = image.copy()
+    thumb.thumbnail((THUMBNAIL_DIMENSION, THUMBNAIL_DIMENSION))
+    thumbnail_url = _upload(f"{stem}-thumb.{ext}", _encode(thumb, save_format, quality=80), content_type)
 
-    return _client().storage.from_(BUCKET).get_public_url(filename)
+    return image_url, thumbnail_url
 
 
-def delete_product_image(image_url: str) -> None:
-    if not image_url or f"/{BUCKET}/" not in image_url:
+def delete_product_image(image_url: str, thumbnail_url: str | None = None) -> None:
+    filenames = []
+    for url in (image_url, thumbnail_url):
+        if url and f"/{BUCKET}/" in url:
+            filenames.append(url.rsplit(f"/{BUCKET}/", 1)[-1])
+    if not filenames:
         return
-    filename = image_url.rsplit(f"/{BUCKET}/", 1)[-1]
     try:
-        _client().storage.from_(BUCKET).remove([filename])
+        _client().storage.from_(BUCKET).remove(filenames)
     except Exception:
         pass

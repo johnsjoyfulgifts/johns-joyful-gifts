@@ -71,7 +71,7 @@
       <div class="image-upload-grid" id="existing-images-grid">
         {% for img in product.images %}
         <div class="image-upload-grid__item" draggable="true" data-image-id="{{ img.id }}">
-          <div class="thumb-preview"><img src="{{ img.image_url }}" alt=""></div>
+          <div class="thumb-preview"><img src="{{ img.display_thumbnail }}" alt="" loading="lazy"></div>
           <div style="text-align:center; margin-top:4px;">
             <span class="badge badge--info primary-badge" style="{{ '' if loop.first else 'display:none;' }} font-size:0.62rem; padding:2px 7px;">Primary</span>
             <button type="button" class="btn btn-sm btn-outline make-primary-btn" style="{{ 'display:none;' if loop.first else '' }} margin-top:3px; padding:3px 8px; font-size:0.68rem;">★ Make Primary</button>

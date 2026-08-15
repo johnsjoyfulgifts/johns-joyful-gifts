@@ -108,6 +108,27 @@
       <input class="form-control" id="announcement_text" name="announcement_text" maxlength="200" value="{{ values.announcement_text }}" placeholder="🎉 Diwali Sale — Free delivery on orders above ₹999!">
     </div>
 
+    <h2 style="font-size:1rem;">WhatsApp Message Templates</h2>
+    <p class="field-hint" style="margin-top:-6px;">
+      Controls the text that's pre-filled when a customer taps a WhatsApp enquiry button. They can still edit it before sending.
+      Placeholders: <code>[PRODUCT_NAME]</code> <code>[SKU]</code> <code>[PRICE]</code> <code>[QUANTITY]</code> <code>[CART_TOTAL]</code> <code>[CUSTOMER_NAME]</code> (cart template also supports <code>[CART_ITEMS]</code>). Leave blank to use the default wording.
+    </p>
+    <div class="form-group">
+      <label for="whatsapp_product_template">Single Product Enquiry Template</label>
+      <textarea class="form-control" id="whatsapp_product_template" name="whatsapp_product_template" rows="4" placeholder="{{ default_product_template }}">{{ values.whatsapp_product_template }}</textarea>
+    </div>
+    <div class="form-group">
+      <label for="whatsapp_cart_template">Cart Enquiry Template</label>
+      <textarea class="form-control" id="whatsapp_cart_template" name="whatsapp_cart_template" rows="4" placeholder="{{ default_cart_template }}">{{ values.whatsapp_cart_template }}</textarea>
+    </div>
+
+    <h2 style="font-size:1rem;">Stock Alerts</h2>
+    <div class="form-group">
+      <label for="low_stock_threshold">Low Stock Threshold</label>
+      <input class="form-control" id="low_stock_threshold" type="number" step="1" min="0" name="low_stock_threshold" value="{{ values.low_stock_threshold }}" style="max-width:120px;">
+      <p class="field-hint">Products at or below this stock count are flagged as "Low Stock" everywhere in the shop and admin.</p>
+    </div>
+
     <h2 style="font-size:1rem;">About Page</h2>
     <div class="form-group">
       <label for="about_text">About Us Text</label>

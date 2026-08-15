@@ -12,7 +12,7 @@
       {% for line in lines %}
       <div class="cart-line">
         <div class="cart-line__img">
-          {% if line.product.primary_image %}<img src="{{ line.product.primary_image.image_url }}" alt="">{% else %}🎁{% endif %}
+          {% if line.product.primary_image %}<img src="{{ line.product.primary_image.display_thumbnail }}" alt="" loading="lazy">{% else %}🎁{% endif %}
         </div>
         <div class="cart-line__info">
           <div class="cart-line__name">{{ line.product.name }}</div>

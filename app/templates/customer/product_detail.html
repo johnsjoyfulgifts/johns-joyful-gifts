@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% import "customer/_product_card.html" as cards %}
+{% import "customer/_product_card.html" as cards with context %}
 {% import "_whatsapp_icon.html" as wa %}
 {% import "_stars.html" as stars_macro %}
 {% block title %}{{ product.name }} — {{ store.store_name }}{% endblock %}
@@ -9,6 +9,31 @@
 <meta property="og:title" content="{{ product.name }}">
 <meta property="og:type" content="product">
 {% if product.primary_image %}<meta property="og:image" content="{{ product.primary_image.image_url }}">{% endif %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": {{ product.name | tojson }},
+  "description": {{ (product.short_description or product.description or product.name) | tojson }},
+  {% if product.sku %}"sku": {{ product.sku | tojson }},{% endif %}
+  {% if product.primary_image %}"image": [{{ product.primary_image.image_url | tojson }}],{% endif %}
+  {% if product.category %}"category": {{ product.category.name | tojson }},{% endif %}
+  "offers": {
+    "@type": "Offer",
+    "url": {{ (request.url.scheme ~ "://" ~ request.url.netloc ~ request.url.path) | tojson }},
+    "priceCurrency": "INR",
+    "price": {{ product.price | tojson }},
+    "availability": {{ ("https://schema.org/InStock" if product.in_stock else "https://schema.org/OutOfStock") | tojson }}
+  }
+  {%- if review_count %},
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": {{ average_rating | tojson }},
+    "reviewCount": {{ review_count | tojson }}
+  }
+  {%- endif %}
+}
+</script>
 {% endblock %}
 
 {% block content %}
@@ -35,8 +60,8 @@
       {% if product.images|length > 1 %}
       <div class="product-gallery__thumbs" id="gallery-thumbs">
         {% for img in product.images %}
-        <img src="{{ img.image_url }}" alt="" class="{{ 'active' if loop.first }}" data-index="{{ loop.index0 }}"
-             onclick="setGalleryImage({{ loop.index0 }});">
+        <img src="{{ img.display_thumbnail }}" alt="" class="{{ 'active' if loop.first }}" data-index="{{ loop.index0 }}"
+             loading="{{ 'eager' if loop.first else 'lazy' }}" onclick="setGalleryImage({{ loop.index0 }});">
         {% endfor %}
       </div>
       <script>
@@ -57,6 +82,7 @@
 
     <div>
       <h1 style="margin:0 0 8px; font-size:1.5rem;">{{ product.name }}</h1>
+      {% if product.sku %}<p class="text-muted" style="font-size:0.8rem; margin:-4px 0 8px;">SKU: {{ product.sku }}</p>{% endif %}
       {% if product.short_description %}<p class="text-muted">{{ product.short_description }}</p>{% endif %}
 
       {% if review_count %}
@@ -76,7 +102,7 @@
 
       {% if not product.in_stock %}
         <p class="badge badge--danger">Out of Stock</p>
-      {% elif product.stock <= 5 %}
+      {% elif product.stock <= (store.low_stock_threshold|int) %}
         <p class="badge badge--warning">Low Stock — only {{ product.stock }} left</p>
       {% else %}
         <p class="badge badge--success">In Stock</p>

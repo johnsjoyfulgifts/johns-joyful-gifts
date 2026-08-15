@@ -81,9 +81,14 @@ class Product(Base):
     bestseller: Mapped[bool] = mapped_column(Boolean, default=False)
     new_arrival: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
-    sku: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    sku: Mapped[str | None] = mapped_column(String(80), nullable=True, unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+    # Soft delete: NULL = not deleted (the common case). A separate concept
+    # from `active` (which just hides a product from customers while keeping
+    # it in normal admin views) — a deleted product is filtered out of every
+    # admin view too except the dedicated "Deleted Products" page.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
     category: Mapped["Category | None"] = relationship(back_populates="products")
     images: Mapped[list["ProductImage"]] = relationship(
@@ -111,9 +116,16 @@ class ProductImage(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
     image_url: Mapped[str] = mapped_column(String(500))
+    thumbnail_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
     product: Mapped["Product"] = relationship(back_populates="images")
+
+    @property
+    def display_thumbnail(self) -> str:
+        """Older rows uploaded before thumbnails existed have none — falling
+        back to the full image keeps them rendering exactly as before."""
+        return self.thumbnail_url or self.image_url
 
 
 class Customer(Base):
@@ -270,4 +282,42 @@ class Setting(Base):
     value: Mapped[str] = mapped_column(Text)
 
 
+class AuditLog(Base):
+    """Admin activity trail — who did what, when. admin_id is nullable so a
+    log entry can outlive the admin account that created it (rather than
+    cascade-deleting history if an admin account is ever removed)."""
+
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    admin_id: Mapped[int | None] = mapped_column(ForeignKey("admins.id", ondelete="SET NULL"), nullable=True, index=True)
+    admin_name: Mapped[str] = mapped_column(String(120))
+    action: Mapped[str] = mapped_column(String(60), index=True)
+    description: Mapped[str] = mapped_column(String(500))
+    related_type: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    related_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, index=True)
+
+    admin: Mapped["Admin | None"] = relationship()
+
+
+class Enquiry(Base):
+    __tablename__ = "enquiries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    customer_name: Mapped[str] = mapped_column(String(150))
+    customer_phone: Mapped[str] = mapped_column(String(20))
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), nullable=True, index=True)
+    quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="New", index=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    product: Mapped["Product | None"] = relationship()
+
+
 Index("ix_orders_status_created", Order.order_status, Order.created_at)
+# Every customer-facing product listing (home, shop, category, search,
+# product detail) filters on exactly this pair — see base_active_query().
+Index("ix_products_active_deleted", Product.active, Product.deleted_at)

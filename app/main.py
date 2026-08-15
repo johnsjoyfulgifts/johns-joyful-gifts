@@ -32,6 +32,21 @@ async def no_cache_static_assets(request: Request, call_next):
     return response
 
 
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Baseline hardening for every response — none of this changes app
+    behavior, it just tells browsers to enforce protections they already
+    support: no MIME-sniffing, no framing (clickjacking), don't leak the
+    full referrer URL to third parties, and disable APIs this site never
+    uses (camera/mic/geolocation)."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
+
+
 BASE_DIR = os.path.dirname(__file__)
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 

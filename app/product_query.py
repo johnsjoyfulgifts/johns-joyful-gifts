@@ -7,7 +7,7 @@ PAGE_SIZE = 20
 
 
 def base_active_query(db: Session):
-    return db.query(Product).filter(Product.active.is_(True))
+    return db.query(Product).filter(Product.active.is_(True), Product.deleted_at.is_(None))
 
 
 def apply_filters(query, category_id=None, min_price=None, max_price=None, in_stock_only=False, search=None):
@@ -21,7 +21,7 @@ def apply_filters(query, category_id=None, min_price=None, max_price=None, in_st
         query = query.filter(Product.stock > 0)
     if search:
         like = f"%{search.strip()}%"
-        query = query.filter(or_(Product.name.ilike(like), Product.short_description.ilike(like), Product.description.ilike(like)))
+        query = query.filter(or_(Product.name.ilike(like), Product.short_description.ilike(like), Product.description.ilike(like), Product.sku.ilike(like)))
     return query
 
 

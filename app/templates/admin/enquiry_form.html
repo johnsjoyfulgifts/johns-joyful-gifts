@@ -1,0 +1,52 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{{ 'Edit' if enquiry else 'Log' }} Enquiry — Admin{% endblock %}
+{% block page_title %}{{ 'Edit' if enquiry else 'Log' }} Enquiry{% endblock %}
+
+{% block admin_content %}
+<div class="card" style="max-width:560px;">
+  {% if error %}<div class="alert alert--error">{{ error }}</div>{% endif %}
+  <form method="post">
+    <div class="form-row form-row--2">
+      <div class="form-group">
+        <label for="customer_name">Customer Name *</label>
+        <input class="form-control" id="customer_name" name="customer_name" value="{{ enquiry.customer_name if enquiry else '' }}" required>
+      </div>
+      <div class="form-group">
+        <label for="customer_phone">Phone Number *</label>
+        <input class="form-control" id="customer_phone" name="customer_phone" value="{{ enquiry.customer_phone if enquiry else '' }}" placeholder="+919999999999" required>
+      </div>
+    </div>
+
+    <div class="form-row form-row--2">
+      <div class="form-group">
+        <label for="product_id">Product (optional)</label>
+        <select class="form-control" id="product_id" name="product_id">
+          <option value="">— No specific product —</option>
+          {% for p in products %}<option value="{{ p.id }}" {{ 'selected' if enquiry and enquiry.product_id == p.id }}>{{ p.name }}{{ ' (' + p.sku + ')' if p.sku }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="quantity">Quantity (optional)</label>
+        <input class="form-control" id="quantity" type="number" min="1" name="quantity" value="{{ enquiry.quantity if enquiry and enquiry.quantity else '' }}">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="status">Status</label>
+      <select class="form-control" id="status" name="status">
+        {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if (enquiry and enquiry.status == s) or (not enquiry and s == 'New') }}>{{ s }}</option>{% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="notes">Notes (optional)</label>
+      <textarea class="form-control" id="notes" name="notes" rows="3">{{ enquiry.notes if enquiry else '' }}</textarea>
+    </div>
+
+    <div class="flex gap-8">
+      <button type="submit" class="btn btn-primary">Save Enquiry</button>
+      <a class="btn btn-secondary" href="/admin/enquiries">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

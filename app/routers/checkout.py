@@ -158,7 +158,7 @@ async def api_checkout(
         for pid_str, qty in raw_cart.items():
             pid = int(pid_str)
             product = products_by_id.get(pid)
-            if product is None or not product.active:
+            if product is None or not product.active or product.deleted_at is not None:
                 problems.append("One of the items in your cart is no longer available.")
                 continue
             if product.stock < qty:

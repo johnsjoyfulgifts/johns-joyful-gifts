@@ -2,10 +2,11 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Form, Request, UploadFile
 from fastapi import File as FastAPIFile
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
+from app.audit import log_activity
 from app.auth import (
     clear_session_cookie,
     get_current_admin,
@@ -14,24 +15,29 @@ from app.auth import (
     set_session_cookie,
     verify_password,
 )
+from app.backup_service import build_backup
 from app.database import get_db
 from app.rate_limit import is_rate_limited
 from app.models import (
     Admin,
+    AuditLog,
     Category,
     Coupon,
     Customer,
+    Enquiry,
     Order,
     OrderStatus,
     OrderStatusHistory,
     Product,
     ProductImage,
     Review,
+    now_utc,
 )
-from app.settings_service import DEFAULTS, get_all_settings, set_settings
+from app.settings_service import DEFAULTS, get_all_settings, get_setting, set_settings
 from app.storage import UploadValidationError, delete_product_image, save_product_image
 from app.templating import render_admin
 from app.utils.slugs import unique_slug
+from app.utils.whatsapp import DEFAULT_CART_TEMPLATE, DEFAULT_PRODUCT_TEMPLATE
 
 router = APIRouter(prefix="/admin")
 
@@ -127,23 +133,35 @@ def dashboard(request: Request, db: Session = Depends(get_db), admin: Admin = De
     counts_by_status = dict(db.query(Order.order_status, func.count(Order.id)).group_by(Order.order_status).all())
     total_orders = sum(counts_by_status.values())
     total_sales = db.query(func.coalesce(func.sum(Order.total), 0)).filter(Order.order_status != OrderStatus.CANCELLED.value).scalar()
-    low_stock = db.query(Product).filter(Product.active.is_(True), Product.stock <= 5, Product.stock > 0).order_by(Product.stock).limit(8).all()
-    low_stock_count = db.query(Product).filter(Product.active.is_(True), Product.stock <= 5, Product.stock > 0).count()
-    out_of_stock_count = db.query(Product).filter(Product.active.is_(True), Product.stock <= 0).count()
+    low_stock_threshold = int(get_setting(db, "low_stock_threshold") or 5)
+    not_deleted = Product.deleted_at.is_(None)
+    low_stock = (
+        db.query(Product)
+        .filter(Product.active.is_(True), not_deleted, Product.stock <= low_stock_threshold, Product.stock > 0)
+        .order_by(Product.stock)
+        .limit(8)
+        .all()
+    )
+    low_stock_count = (
+        db.query(Product)
+        .filter(Product.active.is_(True), not_deleted, Product.stock <= low_stock_threshold, Product.stock > 0)
+        .count()
+    )
+    out_of_stock_count = db.query(Product).filter(Product.active.is_(True), not_deleted, Product.stock <= 0).count()
     new_order_count = db.query(Order).filter(Order.viewed_by_admin.is_(False)).count()
     recent_orders = db.query(Order).options(joinedload(Order.customer)).order_by(Order.created_at.desc()).limit(10).all()
 
-    total_products = db.query(Product).count()
-    active_products = db.query(Product).filter(Product.active.is_(True)).count()
-    featured_count = db.query(Product).filter(Product.active.is_(True), Product.featured.is_(True)).count()
-    new_arrival_count = db.query(Product).filter(Product.active.is_(True), Product.new_arrival.is_(True)).count()
+    total_products = db.query(Product).filter(not_deleted).count()
+    active_products = db.query(Product).filter(Product.active.is_(True), not_deleted).count()
+    featured_count = db.query(Product).filter(Product.active.is_(True), not_deleted, Product.featured.is_(True)).count()
+    new_arrival_count = db.query(Product).filter(Product.active.is_(True), not_deleted, Product.new_arrival.is_(True)).count()
     sale_count = (
         db.query(Product)
-        .filter(Product.active.is_(True), Product.original_price.isnot(None), Product.original_price > Product.price)
+        .filter(Product.active.is_(True), not_deleted, Product.original_price.isnot(None), Product.original_price > Product.price)
         .count()
     )
     pending_review_count = db.query(Review).filter(Review.approved.is_(False)).count()
-    recent_products = db.query(Product).order_by(Product.created_at.desc()).limit(5).all()
+    recent_products = db.query(Product).filter(not_deleted).order_by(Product.created_at.desc()).limit(5).all()
 
     return render_admin(
         request,
@@ -205,7 +223,7 @@ def category_new_submit(
     image_url = None
     if image is not None and image.filename:
         try:
-            image_url = save_product_image(image)
+            image_url, _ = save_product_image(image)
         except UploadValidationError as exc:
             return render_admin(
                 request, "admin/category_form.html", {"active_nav": "categories", "category": None, "error": exc.detail}, db, status_code=400
@@ -248,7 +266,7 @@ def category_edit_submit(
 
     if image is not None and image.filename:
         try:
-            new_image_url = save_product_image(image)
+            new_image_url, _ = save_product_image(image)
         except UploadValidationError as exc:
             return render_admin(
                 request, "admin/category_form.html", {"active_nav": "categories", "category": category, "error": exc.detail}, db, status_code=400
@@ -287,7 +305,7 @@ def products_list(
     db: Session = Depends(get_db),
     admin: Admin = Depends(require_admin),
 ):
-    query = db.query(Product)
+    query = db.query(Product).filter(Product.deleted_at.is_(None))
     if q:
         like = f"%{q.strip()}%"
         query = query.filter(Product.name.ilike(like))
@@ -360,6 +378,7 @@ async def product_new_submit(
     admin: Admin = Depends(require_admin),
 ):
     name = name.strip()
+    sku = sku.strip().upper() or None
     uploaded_images = [img for img in images if img is not None and img.filename]
     error = None
     if not name:
@@ -368,6 +387,8 @@ async def product_new_submit(
         error = "Price cannot be negative."
     elif stock < 0:
         error = "Stock cannot be negative."
+    elif sku and db.query(Product).filter(Product.sku == sku).first() is not None:
+        error = f"SKU '{sku}' is already used by another product."
     elif len(uploaded_images) < MIN_PRODUCT_IMAGES:
         error = f"Please upload at least {MIN_PRODUCT_IMAGES} product images (maximum {MAX_PRODUCT_IMAGES})."
     elif len(uploaded_images) > MAX_PRODUCT_IMAGES:
@@ -376,13 +397,13 @@ async def product_new_submit(
     if error:
         return render_admin(request, "admin/product_form.html", _product_form_context(db, error=error), db, status_code=400)
 
-    saved_urls = []
+    saved_images = []
     for image in uploaded_images:
         try:
-            saved_urls.append(save_product_image(image))
+            saved_images.append(save_product_image(image))
         except UploadValidationError as exc:
-            for url in saved_urls:
-                delete_product_image(url)
+            for url, thumb_url in saved_images:
+                delete_product_image(url, thumb_url)
             return render_admin(request, "admin/product_form.html", _product_form_context(db, error=exc.detail), db, status_code=400)
 
     product = Product(
@@ -394,7 +415,7 @@ async def product_new_submit(
         price=price,
         original_price=float(original_price) if original_price else None,
         stock=stock,
-        sku=sku or None,
+        sku=sku,
         featured=featured,
         bestseller=bestseller,
         new_arrival=new_arrival,
@@ -403,9 +424,15 @@ async def product_new_submit(
     db.add(product)
     db.flush()
 
-    for idx, url in enumerate(saved_urls):
-        db.add(ProductImage(product_id=product.id, image_url=url, sort_order=idx))
+    # A blank SKU is auto-generated from the product's own (now-known) id,
+    # so it's guaranteed unique without a race and never touches the id itself.
+    if not product.sku:
+        product.sku = f"JJG-{product.id:04d}"
 
+    for idx, (url, thumb_url) in enumerate(saved_images):
+        db.add(ProductImage(product_id=product.id, image_url=url, thumbnail_url=thumb_url, sort_order=idx))
+
+    log_activity(db, admin, "product.created", f"Created product '{product.name}' ({product.sku})", "product", product.id)
     db.commit()
     return RedirectResponse(url="/admin/products", status_code=303)
 
@@ -445,6 +472,7 @@ async def product_edit_submit(
         return RedirectResponse(url="/admin/products", status_code=303)
 
     name = name.strip()
+    sku = sku.strip().upper() or None
     uploaded_images = [img for img in images if img is not None and img.filename]
     remaining_existing = [img for img in product.images if img.id not in delete_image_ids]
     error = None
@@ -454,6 +482,8 @@ async def product_edit_submit(
         error = "Price cannot be negative."
     elif stock < 0:
         error = "Stock cannot be negative."
+    elif sku and db.query(Product).filter(Product.sku == sku, Product.id != product.id).first() is not None:
+        error = f"SKU '{sku}' is already used by another product."
     elif len(remaining_existing) + len(uploaded_images) > MAX_PRODUCT_IMAGES:
         error = f"A product can have a maximum of {MAX_PRODUCT_IMAGES} images. Please remove some before adding more."
 
@@ -462,7 +492,7 @@ async def product_edit_submit(
 
     for img in list(product.images):
         if img.id in delete_image_ids:
-            delete_product_image(img.image_url)
+            delete_product_image(img.image_url, img.thumbnail_url)
             db.delete(img)
 
     # Reorder the images the admin kept, per drag-reorder / "Make Primary" in
@@ -479,15 +509,27 @@ async def product_edit_submit(
     max_sort = len(ordered_ids) - 1
     for image in uploaded_images:
         try:
-            url = save_product_image(image)
+            url, thumb_url = save_product_image(image)
         except UploadValidationError as exc:
             db.rollback()
             return render_admin(request, "admin/product_form.html", _product_form_context(db, product=product, error=exc.detail), db, status_code=400)
         max_sort += 1
-        db.add(ProductImage(product_id=product.id, image_url=url, sort_order=max_sort))
+        db.add(ProductImage(product_id=product.id, image_url=url, thumbnail_url=thumb_url, sort_order=max_sort))
 
     if name != product.name:
         product.slug = unique_slug(db, Product, name, exclude_id=product.id)
+
+    # Compare before overwriting, so the audit log records exactly which
+    # fields actually changed rather than just "product updated".
+    new_original_price = float(original_price) if original_price else None
+    changes = []
+    if stock != product.stock:
+        changes.append(f"stock {product.stock} → {stock}")
+    if price != product.price:
+        changes.append(f"price ₹{product.price:.2f} → ₹{price:.2f}")
+    if new_original_price != product.original_price:
+        changes.append("discount changed")
+
     product.name = name
     product.description = description or None
     product.short_description = short_description or None
@@ -495,11 +537,17 @@ async def product_edit_submit(
     product.price = price
     product.original_price = float(original_price) if original_price else None
     product.stock = stock
-    product.sku = sku or None
+    if not product.sku:
+        product.sku = sku or f"JJG-{product.id:04d}"
+    else:
+        product.sku = sku or product.sku
     product.featured = featured
     product.bestseller = bestseller
     product.new_arrival = new_arrival
     product.active = active
+
+    description_text = f"Updated product '{product.name}'" + (f" ({'; '.join(changes)})" if changes else "")
+    log_activity(db, admin, "product.updated", description_text, "product", product.id)
 
     db.commit()
     return RedirectResponse(url="/admin/products", status_code=303)
@@ -507,13 +555,47 @@ async def product_edit_submit(
 
 @router.post("/products/{product_id}/delete")
 def product_delete(product_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
-    product = db.query(Product).options(joinedload(Product.images)).filter(Product.id == product_id).first()
-    if product is not None:
-        for img in product.images:
-            delete_product_image(img.image_url)
-        db.delete(product)
+    """Soft delete: images and the row itself are kept (so it can be
+    restored exactly as it was) — only hidden from every customer-facing
+    and normal admin view. Use /delete-permanent for a real, irreversible
+    delete from the Deleted Products page."""
+    product = db.get(Product, product_id)
+    if product is not None and product.deleted_at is None:
+        product.deleted_at = now_utc()
+        product.active = False
+        log_activity(db, admin, "product.deleted", f"Deleted product '{product.name}'", "product", product.id)
         db.commit()
     return RedirectResponse(url="/admin/products", status_code=303)
+
+
+@router.get("/products/deleted")
+def products_deleted_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    products = db.query(Product).filter(Product.deleted_at.isnot(None)).order_by(Product.deleted_at.desc()).all()
+    return render_admin(request, "admin/products_deleted.html", {"active_nav": "products", "products": products}, db)
+
+
+@router.post("/products/{product_id}/restore")
+def product_restore(product_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    product = db.get(Product, product_id)
+    if product is not None and product.deleted_at is not None:
+        product.deleted_at = None
+        product.active = True
+        log_activity(db, admin, "product.restored", f"Restored product '{product.name}'", "product", product.id)
+        db.commit()
+    return RedirectResponse(url="/admin/products/deleted", status_code=303)
+
+
+@router.post("/products/{product_id}/delete-permanent")
+def product_delete_permanent(product_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    product = db.query(Product).options(joinedload(Product.images)).filter(Product.id == product_id).first()
+    if product is not None and product.deleted_at is not None:
+        name = product.name
+        for img in product.images:
+            delete_product_image(img.image_url, img.thumbnail_url)
+        db.delete(product)
+        log_activity(db, admin, "product.deleted_permanent", f"Permanently deleted product '{name}'")
+        db.commit()
+    return RedirectResponse(url="/admin/products/deleted", status_code=303)
 
 
 @router.post("/products/{product_id}/duplicate")
@@ -540,8 +622,10 @@ def product_duplicate(product_id: int, db: Session = Depends(get_db), admin: Adm
     )
     db.add(duplicate)
     db.flush()
+    duplicate.sku = f"JJG-{duplicate.id:04d}"
     for img in original.images:
-        db.add(ProductImage(product_id=duplicate.id, image_url=img.image_url, sort_order=img.sort_order))
+        db.add(ProductImage(product_id=duplicate.id, image_url=img.image_url, thumbnail_url=img.thumbnail_url, sort_order=img.sort_order))
+    log_activity(db, admin, "product.created", f"Duplicated '{original.name}' as '{duplicate.name}' ({duplicate.sku})", "product", duplicate.id)
     db.commit()
     return RedirectResponse(url=f"/admin/products/{duplicate.id}/edit", status_code=303)
 
@@ -560,7 +644,17 @@ def product_toggle_active(product_id: int, db: Session = Depends(get_db), admin:
 @router.get("/settings")
 def settings_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
     values = get_all_settings(db)
-    return render_admin(request, "admin/settings.html", {"active_nav": "settings", "values": values}, db)
+    return render_admin(
+        request,
+        "admin/settings.html",
+        {
+            "active_nav": "settings",
+            "values": values,
+            "default_product_template": DEFAULT_PRODUCT_TEMPLATE,
+            "default_cart_template": DEFAULT_CART_TEMPLATE,
+        },
+        db,
+    )
 
 
 @router.post("/settings")
@@ -578,6 +672,9 @@ def settings_submit(
     contact_address: str = Form(""),
     announcement_enabled: bool = Form(False),
     announcement_text: str = Form(""),
+    low_stock_threshold: str = Form("5"),
+    whatsapp_product_template: str = Form(""),
+    whatsapp_cart_template: str = Form(""),
     manual_payment_enabled: bool = Form(False),
     upi_id: str = Form(""),
     bank_account_name: str = Form(""),
@@ -587,30 +684,84 @@ def settings_submit(
     db: Session = Depends(get_db),
     admin: Admin = Depends(require_admin),
 ):
-    set_settings(
-        db,
-        {
-            "store_name": store_name.strip() or DEFAULTS["store_name"],
-            "store_tagline": store_tagline.strip(),
-            "whatsapp_number": whatsapp_number.strip(),
-            "instagram_url": instagram_url.strip(),
-            "delivery_mode": delivery_mode if delivery_mode in ("flat", "free", "disabled") else "flat",
-            "flat_delivery_charge": flat_delivery_charge or "0",
-            "free_delivery_threshold": free_delivery_threshold or "0",
-            "about_text": about_text,
-            "contact_email": contact_email.strip(),
-            "contact_address": contact_address.strip(),
-            "announcement_enabled": "true" if announcement_enabled else "false",
-            "announcement_text": announcement_text.strip(),
-            "manual_payment_enabled": "true" if manual_payment_enabled else "false",
-            "upi_id": upi_id.strip(),
-            "bank_account_name": bank_account_name.strip(),
-            "bank_account_number": bank_account_number.strip(),
-            "bank_ifsc": bank_ifsc.strip(),
-            "bank_name": bank_name.strip(),
-        },
-    )
+    old_values = get_all_settings(db)
+    new_values = {
+        "store_name": store_name.strip() or DEFAULTS["store_name"],
+        "store_tagline": store_tagline.strip(),
+        "whatsapp_number": whatsapp_number.strip(),
+        "instagram_url": instagram_url.strip(),
+        "delivery_mode": delivery_mode if delivery_mode in ("flat", "free", "disabled") else "flat",
+        "flat_delivery_charge": flat_delivery_charge or "0",
+        "free_delivery_threshold": free_delivery_threshold or "0",
+        "about_text": about_text,
+        "contact_email": contact_email.strip(),
+        "contact_address": contact_address.strip(),
+        "announcement_enabled": "true" if announcement_enabled else "false",
+        "announcement_text": announcement_text.strip(),
+        "low_stock_threshold": str(max(int(low_stock_threshold or 5), 0)),
+        "whatsapp_product_template": whatsapp_product_template.strip(),
+        "whatsapp_cart_template": whatsapp_cart_template.strip(),
+        "manual_payment_enabled": "true" if manual_payment_enabled else "false",
+        "upi_id": upi_id.strip(),
+        "bank_account_name": bank_account_name.strip(),
+        "bank_account_number": bank_account_number.strip(),
+        "bank_ifsc": bank_ifsc.strip(),
+        "bank_name": bank_name.strip(),
+    }
+
+    if old_values.get("whatsapp_number") != new_values["whatsapp_number"]:
+        log_activity(db, admin, "settings.whatsapp_changed", f"WhatsApp number changed to {new_values['whatsapp_number']}")
+    changed_keys = [k for k, v in new_values.items() if old_values.get(k) != v and k != "whatsapp_number"]
+    if changed_keys:
+        log_activity(db, admin, "settings.updated", f"Settings updated: {', '.join(changed_keys)}")
+
+    # log_activity only stages the row (db.add) — it rides along inside the
+    # same commit set_settings() issues, so it's never lost or duplicated.
+    set_settings(db, new_values)
     return RedirectResponse(url="/admin/settings", status_code=303)
+
+
+# ---------- Backup ----------
+
+@router.get("/backup")
+def backup_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    values = get_all_settings(db)
+    return render_admin(request, "admin/backup.html", {"active_nav": "backup", "last_backup_at": values.get("last_backup_at", "")}, db)
+
+
+@router.get("/backup/download")
+def backup_download(db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    data = build_backup(db)
+    set_settings(db, {"last_backup_at": data["exported_at"]})
+
+    filename = f"jjg-backup-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.json"
+    return JSONResponse(content=data, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+# ---------- Activity Log ----------
+
+ACTIVITY_LOG_PAGE_SIZE = 50
+
+
+@router.get("/activity-log")
+def activity_log_page(request: Request, page: int = 1, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    page = max(page, 1)
+    query = db.query(AuditLog).order_by(AuditLog.created_at.desc())
+    total = query.count()
+    entries = query.offset((page - 1) * ACTIVITY_LOG_PAGE_SIZE).limit(ACTIVITY_LOG_PAGE_SIZE).all()
+    total_pages = max((total + ACTIVITY_LOG_PAGE_SIZE - 1) // ACTIVITY_LOG_PAGE_SIZE, 1)
+    return render_admin(
+        request,
+        "admin/activity_log.html",
+        {
+            "active_nav": "activity-log",
+            "entries": entries,
+            "total": total,
+            "page": page,
+            "total_pages": total_pages,
+        },
+        db,
+    )
 
 
 # ---------- Coupons ----------
@@ -789,6 +940,138 @@ def review_delete(review_id: int, db: Session = Depends(get_db), admin: Admin = 
         db.delete(review)
         db.commit()
     return RedirectResponse(url="/admin/reviews", status_code=303)
+
+
+# ---------- WhatsApp Enquiries ----------
+
+ENQUIRY_STATUSES = ["New", "Contacted", "Confirmed", "Completed", "Cancelled"]
+
+
+def _enquiry_form_context(db: Session, enquiry=None, error=None) -> dict:
+    products = db.query(Product).filter(Product.deleted_at.is_(None)).order_by(Product.name).all()
+    return {"active_nav": "enquiries", "enquiry": enquiry, "products": products, "statuses": ENQUIRY_STATUSES, "error": error}
+
+
+@router.get("/enquiries")
+def enquiries_list(
+    request: Request,
+    status: str = "",
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(require_admin),
+):
+    query = db.query(Enquiry).options(joinedload(Enquiry.product))
+    if status in ENQUIRY_STATUSES:
+        query = query.filter(Enquiry.status == status)
+    enquiries = query.order_by(Enquiry.created_at.desc()).all()
+    return render_admin(
+        request,
+        "admin/enquiries_list.html",
+        {"active_nav": "enquiries", "enquiries": enquiries, "status": status, "statuses": ENQUIRY_STATUSES},
+        db,
+    )
+
+
+@router.get("/enquiries/new")
+def enquiry_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    return render_admin(request, "admin/enquiry_form.html", _enquiry_form_context(db), db)
+
+
+@router.post("/enquiries/new")
+def enquiry_new_submit(
+    request: Request,
+    customer_name: str = Form(...),
+    customer_phone: str = Form(...),
+    product_id: str = Form(""),
+    quantity: str = Form(""),
+    status: str = Form("New"),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(require_admin),
+):
+    customer_name = customer_name.strip()
+    customer_phone = customer_phone.strip()
+    error = None
+    if not customer_name:
+        error = "Customer name is required."
+    elif not customer_phone:
+        error = "Customer phone is required."
+
+    if error:
+        return render_admin(request, "admin/enquiry_form.html", _enquiry_form_context(db, error=error), db, status_code=400)
+
+    enquiry = Enquiry(
+        customer_name=customer_name,
+        customer_phone=customer_phone,
+        product_id=int(product_id) if product_id else None,
+        quantity=int(quantity) if quantity.strip() else None,
+        status=status if status in ENQUIRY_STATUSES else "New",
+        notes=notes.strip() or None,
+    )
+    db.add(enquiry)
+    log_activity(db, admin, "enquiry.created", f"Logged enquiry from {customer_name} ({customer_phone})")
+    db.commit()
+    return RedirectResponse(url="/admin/enquiries", status_code=303)
+
+
+@router.get("/enquiries/{enquiry_id}/edit")
+def enquiry_edit_page(enquiry_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    enquiry = db.get(Enquiry, enquiry_id)
+    if enquiry is None:
+        return RedirectResponse(url="/admin/enquiries", status_code=303)
+    return render_admin(request, "admin/enquiry_form.html", _enquiry_form_context(db, enquiry=enquiry), db)
+
+
+@router.post("/enquiries/{enquiry_id}/edit")
+def enquiry_edit_submit(
+    enquiry_id: int,
+    request: Request,
+    customer_name: str = Form(...),
+    customer_phone: str = Form(...),
+    product_id: str = Form(""),
+    quantity: str = Form(""),
+    status: str = Form("New"),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(require_admin),
+):
+    enquiry = db.get(Enquiry, enquiry_id)
+    if enquiry is None:
+        return RedirectResponse(url="/admin/enquiries", status_code=303)
+
+    customer_name = customer_name.strip()
+    customer_phone = customer_phone.strip()
+    error = None
+    if not customer_name:
+        error = "Customer name is required."
+    elif not customer_phone:
+        error = "Customer phone is required."
+
+    if error:
+        return render_admin(request, "admin/enquiry_form.html", _enquiry_form_context(db, enquiry=enquiry, error=error), db, status_code=400)
+
+    status_changed = status != enquiry.status and status in ENQUIRY_STATUSES
+
+    enquiry.customer_name = customer_name
+    enquiry.customer_phone = customer_phone
+    enquiry.product_id = int(product_id) if product_id else None
+    enquiry.quantity = int(quantity) if quantity.strip() else None
+    enquiry.status = status if status in ENQUIRY_STATUSES else enquiry.status
+    enquiry.notes = notes.strip() or None
+
+    if status_changed:
+        log_activity(db, admin, "enquiry.status_changed", f"Enquiry from {customer_name} marked {enquiry.status}", "enquiry", enquiry.id)
+
+    db.commit()
+    return RedirectResponse(url="/admin/enquiries", status_code=303)
+
+
+@router.post("/enquiries/{enquiry_id}/delete")
+def enquiry_delete(enquiry_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    enquiry = db.get(Enquiry, enquiry_id)
+    if enquiry is not None:
+        db.delete(enquiry)
+        db.commit()
+    return RedirectResponse(url="/admin/enquiries", status_code=303)
 
 
 # ---------- Orders ----------

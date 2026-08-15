@@ -200,7 +200,7 @@ def product_detail(slug: str, request: Request, db: Session = Depends(get_db)):
         .filter(Product.slug == slug)
         .first()
     )
-    if product is None or not product.active:
+    if product is None or not product.active or product.deleted_at is not None:
         return render(request, "errors/404.html", {}, db, status_code=404)
 
     related = (
@@ -211,8 +211,17 @@ def product_detail(slug: str, request: Request, db: Session = Depends(get_db)):
         .all()
     )
 
-    whatsapp_number = get_all_settings(db).get("whatsapp_number", "")
-    product_whatsapp_link = whatsapp_chat_link(whatsapp_number, product_enquiry_message(product))
+    store_values = get_all_settings(db)
+    whatsapp_number = store_values.get("whatsapp_number", "")
+    current_customer = get_current_customer(request, db)
+    product_whatsapp_link = whatsapp_chat_link(
+        whatsapp_number,
+        product_enquiry_message(
+            product,
+            template=store_values.get("whatsapp_product_template", ""),
+            customer_name=current_customer.name if current_customer else "",
+        ),
+    )
 
     approved_reviews = (
         db.query(Review)
@@ -224,7 +233,6 @@ def product_detail(slug: str, request: Request, db: Session = Depends(get_db)):
     review_count = len(approved_reviews)
     average_rating = round(sum(r.rating for r in approved_reviews) / review_count, 1) if review_count else 0
 
-    current_customer = get_current_customer(request, db)
     my_review = None
     if current_customer is not None:
         my_review = (
@@ -284,7 +292,7 @@ def refund_policy(request: Request, db: Session = Depends(get_db)):
 def sitemap(request: Request, db: Session = Depends(get_db)):
     base_url = str(request.base_url).rstrip("/")
     static_paths = ["/", "/shop", "/about", "/contact", "/privacy-policy", "/terms", "/shipping-policy", "/refund-policy"]
-    products = db.query(Product.slug).filter(Product.active.is_(True)).all()
+    products = db.query(Product.slug).filter(Product.active.is_(True), Product.deleted_at.is_(None)).all()
     categories = db.query(Category.slug).filter(Category.active.is_(True)).all()
 
     urls = [f"{base_url}{p}" for p in static_paths]

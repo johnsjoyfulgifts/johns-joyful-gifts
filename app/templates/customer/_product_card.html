@@ -3,7 +3,7 @@
   <div class="product-card__img">
     <a href="/product/{{ product.slug }}" aria-label="{{ product.name }}" style="display:block;width:100%;height:100%;">
       {% if product.primary_image %}
-        <img src="{{ product.primary_image.image_url }}" alt="{{ product.name }}" loading="lazy">
+        <img src="{{ product.primary_image.display_thumbnail }}" alt="{{ product.name }}" loading="lazy">
       {% else %}
         <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;">🎁</div>
       {% endif %}
@@ -26,7 +26,7 @@
     </div>
     {% if not product.in_stock %}
       <span class="badge badge--danger">Out of Stock</span>
-    {% elif product.stock <= 5 %}
+    {% elif product.stock <= (store.low_stock_threshold|int) %}
       <span class="badge badge--warning">Low Stock — {{ product.stock }} left</span>
     {% else %}
       <span class="badge badge--success">In Stock</span>

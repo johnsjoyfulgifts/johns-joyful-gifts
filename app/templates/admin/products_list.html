@@ -5,7 +5,10 @@
 {% block admin_content %}
 <div class="flex justify-between items-center" style="margin-bottom:14px; flex-wrap:wrap; gap:10px;">
   <span class="text-muted">{{ total }} products</span>
-  <a class="btn btn-primary btn-sm" href="/admin/products/new">+ Add Product</a>
+  <div class="flex gap-8">
+    <a class="btn btn-secondary btn-sm" href="/admin/products/deleted">Deleted Products</a>
+    <a class="btn btn-primary btn-sm" href="/admin/products/new">+ Add Product</a>
+  </div>
 </div>
 
 <form class="filter-bar" method="get">
@@ -26,21 +29,22 @@
 {% if products %}
 <div class="admin-table-wrap">
   <table class="admin-table">
-    <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Image</th><th>Name</th><th>SKU</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead>
     <tbody>
       {% for p in products %}
       <tr>
-        <td><div class="thumb-preview" style="width:44px;height:44px;">{% if p.primary_image %}<img src="{{ p.primary_image.image_url }}" alt="">{% endif %}</div></td>
+        <td><div class="thumb-preview" style="width:44px;height:44px;">{% if p.primary_image %}<img src="{{ p.primary_image.display_thumbnail }}" alt="" loading="lazy">{% endif %}</div></td>
         <td>{{ p.name }}</td>
+        <td class="text-muted">{{ p.sku or '—' }}</td>
         <td class="text-muted">{{ p.category.name if p.category else '—' }}</td>
         <td>₹{{ "%.0f"|format(p.price) }}</td>
-        <td>{% if p.stock <= 0 %}<span class="badge badge--danger">0</span>{% elif p.stock <= 5 %}<span class="badge badge--warning">{{ p.stock }}</span>{% else %}{{ p.stock }}{% endif %}</td>
+        <td>{% if p.stock <= 0 %}<span class="badge badge--danger">0</span>{% elif p.stock <= (store.low_stock_threshold|int) %}<span class="badge badge--warning">{{ p.stock }}</span>{% else %}{{ p.stock }}{% endif %}</td>
         <td>{% if p.active %}<span class="badge badge--success">Active</span>{% else %}<span class="badge badge--muted">Inactive</span>{% endif %}</td>
         <td>
           <a class="btn btn-sm btn-secondary" href="/admin/products/{{ p.id }}/edit">Edit</a>
           <form method="post" action="/admin/products/{{ p.id }}/duplicate" style="display:inline;"><button type="submit" class="btn btn-sm btn-secondary">Duplicate</button></form>
           <form method="post" action="/admin/products/{{ p.id }}/toggle-active" style="display:inline;"><button type="submit" class="btn btn-sm btn-secondary">{{ 'Deactivate' if p.active else 'Activate' }}</button></form>
-          <form method="post" action="/admin/products/{{ p.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this product permanently?');"><button type="submit" class="btn btn-sm btn-danger">Delete</button></form>
+          <form method="post" action="/admin/products/{{ p.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this product? It will be hidden from the shop and can be restored later from Deleted Products.');"><button type="submit" class="btn btn-sm btn-danger">Delete</button></form>
         </td>
       </tr>
       {% endfor %}
@@ -52,10 +56,10 @@
   {% for p in products %}
   <div class="admin-record-card">
     <div class="flex gap-12 items-center">
-      <div class="thumb-preview" style="width:56px;height:56px;flex-shrink:0;">{% if p.primary_image %}<img src="{{ p.primary_image.image_url }}" alt="">{% endif %}</div>
+      <div class="thumb-preview" style="width:56px;height:56px;flex-shrink:0;">{% if p.primary_image %}<img src="{{ p.primary_image.display_thumbnail }}" alt="" loading="lazy">{% endif %}</div>
       <div style="flex:1;">
         <strong>{{ p.name }}</strong>
-        <div class="text-muted" style="font-size:0.8rem;">₹{{ "%.0f"|format(p.price) }} · Stock: {{ p.stock }}</div>
+        <div class="text-muted" style="font-size:0.8rem;">{{ p.sku or '—' }} · ₹{{ "%.0f"|format(p.price) }} · Stock: {{ p.stock }}</div>
       </div>
       {% if p.active %}<span class="badge badge--success">Active</span>{% else %}<span class="badge badge--muted">Inactive</span>{% endif %}
     </div>
@@ -63,7 +67,7 @@
       <a class="btn btn-sm btn-secondary" href="/admin/products/{{ p.id }}/edit">Edit</a>
       <form method="post" action="/admin/products/{{ p.id }}/duplicate"><button type="submit" class="btn btn-sm btn-secondary">Duplicate</button></form>
       <form method="post" action="/admin/products/{{ p.id }}/toggle-active"><button type="submit" class="btn btn-sm btn-secondary">{{ 'Deactivate' if p.active else 'Activate' }}</button></form>
-      <form method="post" action="/admin/products/{{ p.id }}/delete" onsubmit="return confirm('Delete this product permanently?');"><button type="submit" class="btn btn-sm btn-danger">Delete</button></form>
+      <form method="post" action="/admin/products/{{ p.id }}/delete" onsubmit="return confirm('Delete this product? It will be hidden from the shop and can be restored later from Deleted Products.');"><button type="submit" class="btn btn-sm btn-danger">Delete</button></form>
     </div>
   </div>
   {% endfor %}
