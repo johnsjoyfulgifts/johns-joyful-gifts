@@ -23,6 +23,7 @@ from app.auth import (
 )
 from app.backup_service import build_backup
 from app.database import get_db
+from app.i18n import SUPPORTED_LANGUAGES
 from app.rate_limit import is_rate_limited
 from app.models import (
     Admin,
@@ -33,12 +34,14 @@ from app.models import (
     Customer,
     Enquiry,
     GiftOption,
+    Invoice,
     Order,
     OrderStatus,
     OrderStatusHistory,
     Product,
     ProductEvent,
     ProductImage,
+    Quotation,
     Review,
     now_utc,
     product_collections,
@@ -180,6 +183,15 @@ def dashboard(request: Request, db: Session = Depends(get_db), admin: Admin = De
     pending_review_count = db.query(Review).filter(Review.approved.is_(False)).count()
     recent_products = db.query(Product).filter(not_deleted).order_by(Product.created_at.desc()).limit(5).all()
 
+    new_enquiry_count = db.query(Enquiry).filter(Enquiry.status == "New").count()
+    open_quotation_count = db.query(Quotation).filter(Quotation.status.in_(["Draft", "Sent"])).count()
+    unpaid_invoice_count = db.query(Invoice).filter(Invoice.payment_status.in_(["Unpaid", "Partially Paid"])).count()
+    unpaid_invoice_total = (
+        db.query(func.coalesce(func.sum(Invoice.total - Invoice.amount_paid), 0))
+        .filter(Invoice.payment_status.in_(["Unpaid", "Partially Paid"]))
+        .scalar()
+    )
+
     return render_admin(
         request,
         "admin/dashboard.html",
@@ -203,6 +215,10 @@ def dashboard(request: Request, db: Session = Depends(get_db), admin: Admin = De
             "sale_count": sale_count,
             "pending_review_count": pending_review_count,
             "recent_products": recent_products,
+            "new_enquiry_count": new_enquiry_count,
+            "open_quotation_count": open_quotation_count,
+            "unpaid_invoice_count": unpaid_invoice_count,
+            "unpaid_invoice_total": unpaid_invoice_total,
         },
         db,
     )
@@ -802,6 +818,7 @@ def settings_page(request: Request, db: Session = Depends(get_db), admin: Admin 
             "values": values,
             "default_product_template": DEFAULT_PRODUCT_TEMPLATE,
             "default_cart_template": DEFAULT_CART_TEMPLATE,
+            "languages": SUPPORTED_LANGUAGES,
         },
         db,
     )
@@ -828,6 +845,7 @@ def settings_submit(
     whatsapp_quotation_template: str = Form(""),
     gst_number: str = Form(""),
     default_gst_rate: str = Form("18"),
+    site_language: str = Form("en"),
     manual_payment_enabled: bool = Form(False),
     upi_id: str = Form(""),
     bank_account_name: str = Form(""),
@@ -857,6 +875,7 @@ def settings_submit(
         "whatsapp_quotation_template": whatsapp_quotation_template.strip(),
         "gst_number": gst_number.strip(),
         "default_gst_rate": str(min(max(float(default_gst_rate or 0), 0), 100)),
+        "site_language": site_language if site_language in SUPPORTED_LANGUAGES else "en",
         "manual_payment_enabled": "true" if manual_payment_enabled else "false",
         "upi_id": upi_id.strip(),
         "bank_account_name": bank_account_name.strip(),

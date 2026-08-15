@@ -95,6 +95,17 @@
       </div>
     </div>
 
+    <h2 style="font-size:1rem;">Language</h2>
+    <div class="form-group">
+      <label for="site_language">Storefront Language</label>
+      <select class="form-control" id="site_language" name="site_language" style="max-width:280px;">
+        {% for code, label in languages.items() %}
+        <option value="{{ code }}" {{ 'selected' if values.site_language == code }} {{ 'disabled' if code != 'en' }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <p class="field-hint">The site is built to support more languages — only English is fully translated today.</p>
+    </div>
+
     <h2 style="font-size:1rem;">Quotations &amp; Invoices</h2>
     <p class="field-hint" style="margin-top:-6px;">Used on generated quotation/invoice PDFs and as the default GST rate for new documents.</p>
     <div class="form-row form-row--2">

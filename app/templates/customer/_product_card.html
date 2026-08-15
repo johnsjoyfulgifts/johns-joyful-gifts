@@ -25,21 +25,21 @@
       {% endif %}
     </div>
     {% if not product.in_stock %}
-      <span class="badge badge--danger">Out of Stock</span>
+      <span class="badge badge--danger">{{ t('out_of_stock', current_language) }}</span>
     {% elif product.stock <= (store.low_stock_threshold|int) %}
-      <span class="badge badge--warning">Low Stock — {{ product.stock }} left</span>
+      <span class="badge badge--warning">{{ t('low_stock', current_language, count=product.stock) }}</span>
     {% else %}
-      <span class="badge badge--success">In Stock</span>
+      <span class="badge badge--success">{{ t('in_stock', current_language) }}</span>
     {% endif %}
     <div class="product-card__cta">
       {% if product.in_stock %}
       <form class="js-cart-form" action="/api/cart/add" method="post" data-success-message="Added to cart!">
         <input type="hidden" name="product_id" value="{{ product.id }}">
         <input type="hidden" name="quantity" value="1">
-        <button type="submit" class="btn btn-primary btn-sm btn-block">Add to Cart</button>
+        <button type="submit" class="btn btn-primary btn-sm btn-block">{{ t('add_to_cart', current_language) }}</button>
       </form>
       {% else %}
-      <button class="btn btn-secondary btn-sm btn-block" disabled>Out of Stock</button>
+      <button class="btn btn-secondary btn-sm btn-block" disabled>{{ t('out_of_stock', current_language) }}</button>
       {% endif %}
     </div>
   </div>

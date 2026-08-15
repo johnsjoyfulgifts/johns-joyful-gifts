@@ -84,6 +84,13 @@
       <h1 style="margin:0 0 8px; font-size:1.5rem;">{{ product.name }}</h1>
       {% if product.sku %}<p class="text-muted" style="font-size:0.8rem; margin:-4px 0 8px;">SKU: {{ product.sku }}</p>{% endif %}
       {% if product.short_description %}<p class="text-muted">{{ product.short_description }}</p>{% endif %}
+      {% if product.collections %}
+      <div class="flex gap-8" style="flex-wrap:wrap; margin:8px 0;">
+        {% for occ in product.collections %}
+        <a href="/occasion/{{ occ.slug }}" class="badge badge--info" style="text-decoration:none;">🎉 {{ occ.name }}</a>
+        {% endfor %}
+      </div>
+      {% endif %}
 
       {% if review_count %}
       <div class="flex items-center gap-8" style="margin:4px 0;">
@@ -111,24 +118,10 @@
       <a class="btn btn-whatsapp btn-block js-track-enquiry" data-product-id="{{ product.id }}" href="{{ product_whatsapp_link }}" target="_blank" rel="noopener" style="margin-bottom:10px;">
         {{ wa.whatsapp_icon(18) }} Enquire on WhatsApp
       </a>
-      <script>
-        (function () {
-          var link = document.querySelector('.js-track-enquiry');
-          if (!link) return;
-          link.addEventListener('click', function () {
-            var url = '/api/track/enquiry/' + link.getAttribute('data-product-id');
-            if (navigator.sendBeacon) {
-              navigator.sendBeacon(url);
-            } else {
-              fetch(url, { method: 'POST', keepalive: true });
-            }
-          });
-        })();
-      </script>
 
       <div class="flex items-center gap-8" style="margin-bottom:10px; position:relative;">
         <button type="button" class="wishlist-heart wishlist-heart--inline js-wishlist-toggle" data-product-id="{{ product.id }}" aria-label="Save to wishlist" aria-pressed="false">🤍</button>
-        <span class="text-muted" style="font-size:0.85rem;">Save for later</span>
+        <span class="text-muted" style="font-size:0.85rem;">{{ t('save_for_later', current_language) }}</span>
         <button type="button" class="btn btn-sm btn-outline js-share-product" style="margin-left:auto;" data-url="{{ request.url.scheme }}://{{ request.url.netloc }}{{ request.url.path }}" data-title="{{ product.name }}" aria-haspopup="true" aria-expanded="false">
           🔗 Share
         </button>
@@ -137,50 +130,6 @@
           <a class="js-share-whatsapp" href="#" target="_blank" rel="noopener" style="display:block; width:100%; text-align:left; padding:8px 10px; border-radius:6px; text-decoration:none; color:inherit;">💬 Share on WhatsApp</a>
         </div>
       </div>
-      <script>
-        (function () {
-          var btn = document.querySelector('.js-share-product');
-          if (!btn) return;
-          var url = btn.getAttribute('data-url');
-          var title = btn.getAttribute('data-title');
-          var menu = document.querySelector('.js-share-menu');
-
-          btn.addEventListener('click', async function () {
-            if (navigator.share) {
-              try { await navigator.share({ title: title, url: url }); } catch (e) { /* user cancelled */ }
-              return;
-            }
-            var open = menu.style.display === 'block';
-            menu.style.display = open ? 'none' : 'block';
-            btn.setAttribute('aria-expanded', open ? 'false' : 'true');
-          });
-
-          document.addEventListener('click', function (e) {
-            if (menu && !menu.contains(e.target) && e.target !== btn) {
-              menu.style.display = 'none';
-              btn.setAttribute('aria-expanded', 'false');
-            }
-          });
-
-          var copyBtn = document.querySelector('.js-share-copy');
-          if (copyBtn) {
-            copyBtn.addEventListener('click', async function () {
-              try {
-                await navigator.clipboard.writeText(url);
-                copyBtn.textContent = '✓ Link Copied!';
-              } catch (e) {
-                copyBtn.textContent = 'Could not copy';
-              }
-              setTimeout(function () { copyBtn.textContent = '📋 Copy Link'; }, 1800);
-            });
-          }
-
-          var waLink = document.querySelector('.js-share-whatsapp');
-          if (waLink) {
-            waLink.href = 'https://wa.me/?text=' + encodeURIComponent(title + ' — ' + url);
-          }
-        })();
-      </script>
 
       {% if product.in_stock %}
       <form class="js-cart-form" action="/api/cart/add" method="post" data-reload-on-success="true" style="margin:18px 0;">
@@ -191,21 +140,12 @@
             <input type="number" name="quantity" value="1" min="1" max="{{ product.stock }}" aria-label="Quantity">
             <button type="button" data-qty-step="1" aria-label="Increase quantity">+</button>
           </div>
-          <button type="submit" class="btn btn-primary">Add to Cart</button>
+          <button type="submit" class="btn btn-primary">{{ t('add_to_cart', current_language) }}</button>
         </div>
-        <a href="/checkout" class="btn btn-outline btn-block" style="margin-top:10px;" onclick="return false;" id="buy-now-link">Buy Now</a>
+        <a href="/checkout" class="btn btn-outline btn-block" style="margin-top:10px;" onclick="return false;" id="buy-now-link">{{ t('buy_now', current_language) }}</a>
       </form>
-      <script>
-        document.getElementById('buy-now-link').addEventListener('click', async function (e) {
-          e.preventDefault();
-          var form = this.closest('form');
-          var fd = new FormData(form);
-          await fetch('/api/cart/add', { method: 'POST', body: fd, headers: { Accept: 'application/json' } });
-          window.location.href = '/checkout';
-        });
-      </script>
       {% else %}
-      <button class="btn btn-secondary btn-block" disabled style="margin:18px 0;">Out of Stock</button>
+      <button class="btn btn-secondary btn-block" disabled style="margin:18px 0;">{{ t('out_of_stock', current_language) }}</button>
       {% endif %}
 
       {% if product.description %}
@@ -285,4 +225,75 @@
   </section>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var trackLink = document.querySelector('.js-track-enquiry');
+  if (trackLink) {
+    trackLink.addEventListener('click', function () {
+      var url = '/api/track/enquiry/' + trackLink.getAttribute('data-product-id');
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(url);
+      } else {
+        fetch(url, { method: 'POST', keepalive: true });
+      }
+    });
+  }
+
+  var shareBtn = document.querySelector('.js-share-product');
+  if (shareBtn) {
+    var shareUrl = shareBtn.getAttribute('data-url');
+    var shareTitle = shareBtn.getAttribute('data-title');
+    var shareMenu = document.querySelector('.js-share-menu');
+
+    shareBtn.addEventListener('click', async function () {
+      if (navigator.share) {
+        try { await navigator.share({ title: shareTitle, url: shareUrl }); } catch (e) { /* user cancelled */ }
+        return;
+      }
+      var open = shareMenu.style.display === 'block';
+      shareMenu.style.display = open ? 'none' : 'block';
+      shareBtn.setAttribute('aria-expanded', open ? 'false' : 'true');
+    });
+
+    document.addEventListener('click', function (e) {
+      if (shareMenu && !shareMenu.contains(e.target) && e.target !== shareBtn) {
+        shareMenu.style.display = 'none';
+        shareBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    var copyBtn = document.querySelector('.js-share-copy');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async function () {
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          copyBtn.textContent = '✓ Link Copied!';
+        } catch (e) {
+          copyBtn.textContent = 'Could not copy';
+        }
+        setTimeout(function () { copyBtn.textContent = '📋 Copy Link'; }, 1800);
+      });
+    }
+
+    var waShareLink = document.querySelector('.js-share-whatsapp');
+    if (waShareLink) {
+      waShareLink.href = 'https://wa.me/?text=' + encodeURIComponent(shareTitle + ' — ' + shareUrl);
+    }
+  }
+
+  var buyNowLink = document.getElementById('buy-now-link');
+  if (buyNowLink) {
+    buyNowLink.addEventListener('click', async function (e) {
+      e.preventDefault();
+      var form = this.closest('form');
+      var fd = new FormData(form);
+      await fetch('/api/cart/add', { method: 'POST', body: fd, headers: { Accept: 'application/json' } });
+      window.location.href = '/checkout';
+    });
+  }
+})();
+</script>
 {% endblock %}

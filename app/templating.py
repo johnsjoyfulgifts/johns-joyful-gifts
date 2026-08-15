@@ -6,6 +6,7 @@ from markupsafe import Markup
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from app.i18n import t
 from app.models import Category
 from app.settings_service import get_all_settings
 
@@ -19,6 +20,10 @@ def _tojson_filter(value) -> Markup:
 
 
 templates.env.filters["tojson"] = _tojson_filter
+# {{ t('add_to_cart', current_language) }} — see app/i18n.py. Language is
+# passed explicitly (not read from a global) since Jinja globals aren't
+# request-scoped and this needs to vary per store setting.
+templates.env.globals["t"] = t
 
 
 def _common_context(request, db: Session) -> dict:
@@ -39,6 +44,7 @@ def _common_context(request, db: Session) -> dict:
         "whatsapp_chat_link": whatsapp_chat_link(store.get("whatsapp_number", "")),
         "current_year": datetime.now(timezone.utc).year,
         "current_customer": get_current_customer(request, db),
+        "current_language": store.get("site_language", "en"),
     }
 
 

@@ -3,6 +3,12 @@
 {% block page_title %}Dashboard{% endblock %}
 
 {% block admin_content %}
+{% set role = current_admin.role if current_admin else '' %}
+{% set is_super = role == 'super_admin' %}
+{% set is_product = is_super or role == 'product_manager' %}
+{% set is_order = is_super or role == 'order_enquiry_manager' %}
+
+{% if is_order %}
 <div class="stat-grid">
   <div class="stat-card"><div class="stat-card__value">{{ total_orders }}</div><div class="stat-card__label">Total Orders</div></div>
   <div class="stat-card"><div class="stat-card__value">{{ new_order_count }}</div><div class="stat-card__label">New (Unviewed)</div></div>
@@ -16,7 +22,9 @@
   <div class="stat-card__label">Total Sales (excl. cancelled)</div>
   <div class="stat-card__value" style="font-size:1.8rem;">₹{{ "%.0f"|format(total_sales) }}</div>
 </div>
+{% endif %}
 
+{% if is_product %}
 <h2 style="font-size:1rem; margin:20px 0 10px;">Products</h2>
 <div class="stat-grid">
   <div class="stat-card"><div class="stat-card__value">{{ total_products }}</div><div class="stat-card__label">Total Products</div></div>
@@ -30,8 +38,19 @@
   <div class="stat-card"><div class="stat-card__value">{{ pending_review_count }}</div><div class="stat-card__label">Reviews Pending</div></div>
   {% endif %}
 </div>
+{% endif %}
 
-{% if out_of_stock_count > 0 or low_stock %}
+{% if is_order %}
+<h2 style="font-size:1rem; margin:20px 0 10px;">Sales Documents</h2>
+<div class="stat-grid">
+  <div class="stat-card"><div class="stat-card__value">{{ new_enquiry_count }}</div><div class="stat-card__label">New Enquiries</div></div>
+  <div class="stat-card"><div class="stat-card__value">{{ open_quotation_count }}</div><div class="stat-card__label">Open Quotations</div></div>
+  <div class="stat-card"><div class="stat-card__value">{{ unpaid_invoice_count }}</div><div class="stat-card__label">Unpaid Invoices</div></div>
+  <div class="stat-card"><div class="stat-card__value">₹{{ "%.0f"|format(unpaid_invoice_total) }}</div><div class="stat-card__label">Outstanding Balance</div></div>
+</div>
+{% endif %}
+
+{% if is_product and (out_of_stock_count > 0 or low_stock) %}
 <div class="card" style="margin-top:16px;">
   <h2 style="font-size:1rem; margin-top:0;">Stock Alerts</h2>
   {% if out_of_stock_count > 0 %}<p class="badge badge--danger">{{ out_of_stock_count }} product(s) out of stock</p>{% endif %}
@@ -50,6 +69,7 @@
 </div>
 {% endif %}
 
+{% if is_order %}
 <div class="card" style="margin-top:16px;">
   <div class="flex justify-between items-center">
     <h2 style="font-size:1rem; margin:0;">Recent Orders</h2>
@@ -87,8 +107,9 @@
   <div class="empty-state"><h3>No orders found.</h3></div>
   {% endif %}
 </div>
+{% endif %}
 
-{% if recent_products %}
+{% if is_product and recent_products %}
 <div class="card" style="margin-top:16px;">
   <h2 style="font-size:1rem; margin-top:0;">Recent Activity</h2>
   <ul class="timeline">

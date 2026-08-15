@@ -32,6 +32,7 @@ DEFAULTS: dict[str, str] = {
     "whatsapp_quotation_template": "",
     "gst_number": "",
     "default_gst_rate": "18",
+    "site_language": "en",
     "manual_payment_enabled": "false",
     "upi_id": "",
     "bank_account_name": "",
