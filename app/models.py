@@ -399,6 +399,185 @@ class Enquiry(Base):
     product: Mapped["Product | None"] = relationship()
 
 
+class QuotationStatus(str, enum.Enum):
+    DRAFT = "Draft"
+    SENT = "Sent"
+    ACCEPTED = "Accepted"
+    REJECTED = "Rejected"
+    EXPIRED = "Expired"
+    CONVERTED = "Converted"
+
+
+class Quotation(Base):
+    """A priced proposal sent to a prospective or existing customer before
+    any money changes hands — not an order. GST here is India's standard
+    dual-rate split: CGST+SGST when the sale is within the same state as
+    the store, IGST (the same total rate, undivided) across state lines."""
+
+    __tablename__ = "quotations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    quotation_number: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    customer_name: Mapped[str] = mapped_column(String(150))
+    customer_phone: Mapped[str] = mapped_column(String(20))
+    customer_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    customer_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(20), default=QuotationStatus.DRAFT.value, index=True)
+    subtotal: Mapped[float] = mapped_column(Float, default=0)
+    discount_amount: Mapped[float] = mapped_column(Float, default=0)
+    additional_charges: Mapped[float] = mapped_column(Float, default=0)
+    additional_charges_note: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    gift_charges: Mapped[float] = mapped_column(Float, default=0)
+    gst_rate: Mapped[float] = mapped_column(Float, default=0)  # percent, e.g. 18 for 18%
+    is_interstate: Mapped[bool] = mapped_column(Boolean, default=False)  # IGST vs CGST+SGST split
+    tax_amount: Mapped[float] = mapped_column(Float, default=0)
+    total: Mapped[float] = mapped_column(Float, default=0)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    admin_id: Mapped[int | None] = mapped_column(ForeignKey("admins.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    items: Mapped[list["QuotationItem"]] = relationship(back_populates="quotation", cascade="all, delete-orphan", order_by="QuotationItem.sort_order")
+    gift_options: Mapped[list["QuotationGiftOption"]] = relationship(back_populates="quotation", cascade="all, delete-orphan")
+    customer: Mapped["Customer | None"] = relationship()
+    admin: Mapped["Admin | None"] = relationship()
+
+    @property
+    def cgst_amount(self) -> float:
+        return 0 if self.is_interstate else round(self.tax_amount / 2, 2)
+
+    @property
+    def sgst_amount(self) -> float:
+        return 0 if self.is_interstate else round(self.tax_amount / 2, 2)
+
+    @property
+    def igst_amount(self) -> float:
+        return round(self.tax_amount, 2) if self.is_interstate else 0
+
+
+class QuotationItem(Base):
+    __tablename__ = "quotation_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    quotation_id: Mapped[int] = mapped_column(ForeignKey("quotations.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
+    product_name_snapshot: Mapped[str] = mapped_column(String(200))
+    sku_snapshot: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    unit_price: Mapped[float] = mapped_column(Float)
+    quantity: Mapped[int] = mapped_column(Integer, default=1)
+    discount_percent: Mapped[float] = mapped_column(Float, default=0)
+    subtotal: Mapped[float] = mapped_column(Float)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    quotation: Mapped["Quotation"] = relationship(back_populates="items")
+    product: Mapped["Product | None"] = relationship()
+
+
+class QuotationGiftOption(Base):
+    __tablename__ = "quotation_gift_options"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    quotation_id: Mapped[int] = mapped_column(ForeignKey("quotations.id", ondelete="CASCADE"), index=True)
+    name_snapshot: Mapped[str] = mapped_column(String(80))
+    price_snapshot: Mapped[float] = mapped_column(Float)
+
+    quotation: Mapped["Quotation"] = relationship(back_populates="gift_options")
+
+
+class PaymentStatusFull(str, enum.Enum):
+    DRAFT = "Draft"
+    UNPAID = "Unpaid"
+    PARTIALLY_PAID = "Partially Paid"
+    PAID = "Paid"
+    CANCELLED = "Cancelled"
+
+
+class Invoice(Base):
+    """Structurally the same document as a Quotation (customer, line items,
+    GST, charges) but represents a committed bill rather than a proposal —
+    it carries its own payment_status and can optionally trace back to the
+    quotation it was converted from."""
+
+    __tablename__ = "invoices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    invoice_number: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    quotation_id: Mapped[int | None] = mapped_column(ForeignKey("quotations.id", ondelete="SET NULL"), nullable=True)
+    customer_name: Mapped[str] = mapped_column(String(150))
+    customer_phone: Mapped[str] = mapped_column(String(20))
+    customer_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    customer_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
+    payment_status: Mapped[str] = mapped_column(String(20), default=PaymentStatusFull.DRAFT.value, index=True)
+    subtotal: Mapped[float] = mapped_column(Float, default=0)
+    discount_amount: Mapped[float] = mapped_column(Float, default=0)
+    additional_charges: Mapped[float] = mapped_column(Float, default=0)
+    additional_charges_note: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    gift_charges: Mapped[float] = mapped_column(Float, default=0)
+    gst_rate: Mapped[float] = mapped_column(Float, default=0)
+    is_interstate: Mapped[bool] = mapped_column(Boolean, default=False)
+    tax_amount: Mapped[float] = mapped_column(Float, default=0)
+    total: Mapped[float] = mapped_column(Float, default=0)
+    amount_paid: Mapped[float] = mapped_column(Float, default=0)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    admin_id: Mapped[int | None] = mapped_column(ForeignKey("admins.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    items: Mapped[list["InvoiceItem"]] = relationship(back_populates="invoice", cascade="all, delete-orphan", order_by="InvoiceItem.sort_order")
+    gift_options: Mapped[list["InvoiceGiftOption"]] = relationship(back_populates="invoice", cascade="all, delete-orphan")
+    customer: Mapped["Customer | None"] = relationship()
+    admin: Mapped["Admin | None"] = relationship()
+    quotation: Mapped["Quotation | None"] = relationship()
+
+    @property
+    def cgst_amount(self) -> float:
+        return 0 if self.is_interstate else round(self.tax_amount / 2, 2)
+
+    @property
+    def sgst_amount(self) -> float:
+        return 0 if self.is_interstate else round(self.tax_amount / 2, 2)
+
+    @property
+    def igst_amount(self) -> float:
+        return round(self.tax_amount, 2) if self.is_interstate else 0
+
+    @property
+    def balance_due(self) -> float:
+        return round(self.total - self.amount_paid, 2)
+
+
+class InvoiceItem(Base):
+    __tablename__ = "invoice_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
+    product_name_snapshot: Mapped[str] = mapped_column(String(200))
+    sku_snapshot: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    unit_price: Mapped[float] = mapped_column(Float)
+    quantity: Mapped[int] = mapped_column(Integer, default=1)
+    discount_percent: Mapped[float] = mapped_column(Float, default=0)
+    subtotal: Mapped[float] = mapped_column(Float)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    invoice: Mapped["Invoice"] = relationship(back_populates="items")
+    product: Mapped["Product | None"] = relationship()
+
+
+class InvoiceGiftOption(Base):
+    __tablename__ = "invoice_gift_options"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id", ondelete="CASCADE"), index=True)
+    name_snapshot: Mapped[str] = mapped_column(String(80))
+    price_snapshot: Mapped[float] = mapped_column(Float)
+
+    invoice: Mapped["Invoice"] = relationship(back_populates="gift_options")
+
+
 Index("ix_orders_status_created", Order.order_status, Order.created_at)
 # Every customer-facing product listing (home, shop, category, search,
 # product detail) filters on exactly this pair — see base_active_query().

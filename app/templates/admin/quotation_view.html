@@ -1,0 +1,76 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{{ doc.quotation_number }} — Admin{% endblock %}
+{% block page_title %}Quotation {{ doc.quotation_number }}{% endblock %}
+
+{% block admin_content %}
+<div style="display:grid; gap:16px;" class="order-detail-layout">
+  <div>
+    <div class="card">
+      <h2 style="font-size:1rem; margin-top:0;">Items</h2>
+      {% for item in doc.items %}
+      <div class="cart-summary-row"><span>{{ item.product_name_snapshot }}{{ ' (' + item.sku_snapshot + ')' if item.sku_snapshot }} × {{ item.quantity }}{{ ' − ' + item.discount_percent|string + '%' if item.discount_percent }}</span><span>₹{{ "%.2f"|format(item.subtotal) }}</span></div>
+      {% endfor %}
+      <div class="cart-summary-row"><span>Subtotal</span><span>₹{{ "%.2f"|format(doc.subtotal) }}</span></div>
+      {% if doc.discount_amount %}<div class="cart-summary-row" style="color:var(--color-success);"><span>Discount</span><span>−₹{{ "%.2f"|format(doc.discount_amount) }}</span></div>{% endif %}
+      {% for opt in doc.gift_options %}
+      <div class="cart-summary-row"><span>{{ opt.name_snapshot }}</span><span>₹{{ "%.2f"|format(opt.price_snapshot) }}</span></div>
+      {% endfor %}
+      {% if doc.additional_charges %}<div class="cart-summary-row"><span>{{ doc.additional_charges_note or 'Additional Charges' }}</span><span>₹{{ "%.2f"|format(doc.additional_charges) }}</span></div>{% endif %}
+      {% if doc.gst_rate %}
+        {% if doc.is_interstate %}
+        <div class="cart-summary-row"><span>IGST ({{ doc.gst_rate }}%)</span><span>₹{{ "%.2f"|format(doc.igst_amount) }}</span></div>
+        {% else %}
+        <div class="cart-summary-row"><span>CGST ({{ (doc.gst_rate/2)|round(1) }}%)</span><span>₹{{ "%.2f"|format(doc.cgst_amount) }}</span></div>
+        <div class="cart-summary-row"><span>SGST ({{ (doc.gst_rate/2)|round(1) }}%)</span><span>₹{{ "%.2f"|format(doc.sgst_amount) }}</span></div>
+        {% endif %}
+      {% endif %}
+      <div class="cart-summary-row cart-summary-row--total"><span>Total</span><span>₹{{ "%.2f"|format(doc.total) }}</span></div>
+    </div>
+
+    {% if doc.notes %}
+    <div class="card" style="margin-top:16px;">
+      <h2 style="font-size:1rem; margin-top:0;">Notes</h2>
+      <p class="text-muted" style="white-space:pre-line;">{{ doc.notes }}</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div>
+    <div class="card">
+      <h2 style="font-size:1rem; margin-top:0;">Customer</h2>
+      <p><strong>{{ doc.customer_name }}</strong></p>
+      <p>{{ doc.customer_phone }}</p>
+      {% if doc.customer_email %}<p class="text-muted">{{ doc.customer_email }}</p>{% endif %}
+      {% if doc.customer_address %}<p class="text-muted">{{ doc.customer_address }}</p>{% endif %}
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h2 style="font-size:1rem; margin-top:0;">Status</h2>
+      <form method="post" action="/admin/quotations/{{ doc.id }}/status" class="flex gap-8">
+        <select class="form-control" name="status">
+          {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if doc.status == s }}>{{ s }}</option>{% endfor %}
+        </select>
+        <button type="submit" class="btn btn-secondary">Update</button>
+      </form>
+      <p class="text-muted" style="font-size:0.8rem; margin-top:8px;">Valid until {{ doc.valid_until.strftime('%d %b %Y') if doc.valid_until else '—' }}</p>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h2 style="font-size:1rem; margin-top:0;">Actions</h2>
+      <div class="flex gap-8" style="flex-wrap:wrap;">
+        <a class="btn btn-secondary" href="/admin/quotations/{{ doc.id }}/pdf" target="_blank">📄 View / Download PDF</a>
+        {% if whatsapp_link %}<a class="btn btn-whatsapp" href="{{ whatsapp_link }}" target="_blank" rel="noopener">💬 Send via WhatsApp</a>{% endif %}
+        <a class="btn btn-secondary" href="/admin/quotations/{{ doc.id }}/edit">Edit</a>
+        {% if doc.status != 'Converted' %}
+        <form method="post" action="/admin/quotations/{{ doc.id }}/convert-to-invoice" onsubmit="return confirm('Convert this quotation into an invoice?');">
+          <button type="submit" class="btn btn-secondary">Convert to Invoice</button>
+        </form>
+        {% endif %}
+        <form method="post" action="/admin/quotations/{{ doc.id }}/delete" onsubmit="return confirm('Delete this quotation?');">
+          <button type="submit" class="btn btn-danger">Delete</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

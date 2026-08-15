@@ -127,6 +127,7 @@ def favicon():
 
 from app.routers import (  # noqa: E402
     admin_api,
+    admin_documents,
     admin_pages,
     cart,
     checkout,
@@ -145,4 +146,5 @@ app.include_router(tracking.router)
 app.include_router(wishlist.router)
 app.include_router(reviews.router)
 app.include_router(admin_pages.router)
+app.include_router(admin_documents.router)
 app.include_router(admin_api.router)

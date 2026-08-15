@@ -32,6 +32,8 @@
         {% if is_product %}<a href="/admin/gift-options" class="{{ 'active' if active_nav == 'gift-options' else '' }}">🎁 Gift Options</a>{% endif %}
         {% if is_product %}<a href="/admin/reviews" class="{{ 'active' if active_nav == 'reviews' else '' }}">⭐ Reviews</a>{% endif %}
         {% if is_order %}<a href="/admin/enquiries" class="{{ 'active' if active_nav == 'enquiries' else '' }}">💬 Enquiries</a>{% endif %}
+        {% if is_order %}<a href="/admin/quotations" class="{{ 'active' if active_nav == 'quotations' else '' }}">📋 Quotations</a>{% endif %}
+        {% if is_order %}<a href="/admin/invoices" class="{{ 'active' if active_nav == 'invoices' else '' }}">🧾 Invoices</a>{% endif %}
         {% if is_super %}<a href="/admin/backup" class="{{ 'active' if active_nav == 'backup' else '' }}">💾 Backup</a>{% endif %}
         {% if is_super %}<a href="/admin/activity-log" class="{{ 'active' if active_nav == 'activity-log' else '' }}">📜 Activity Log</a>{% endif %}
         <a href="/admin/analytics" class="{{ 'active' if active_nav == 'analytics' else '' }}">📈 Analytics</a>

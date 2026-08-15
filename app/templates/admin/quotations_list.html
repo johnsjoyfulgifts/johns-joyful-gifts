@@ -1,0 +1,47 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Quotations — Admin{% endblock %}
+{% block page_title %}Quotations{% endblock %}
+
+{% block admin_content %}
+<div class="flex justify-between items-center" style="margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+  <span class="text-muted">{{ quotations|length }} quotations</span>
+  <a class="btn btn-primary btn-sm" href="/admin/quotations/new">+ New Quotation</a>
+</div>
+
+<form class="filter-bar" method="get">
+  <select name="status" onchange="this.form.submit()">
+    <option value="" {{ 'selected' if not status }}>All Status</option>
+    {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if status == s }}>{{ s }}</option>{% endfor %}
+  </select>
+</form>
+
+{% if quotations %}
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead><tr><th>Number</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for q in quotations %}
+      <tr>
+        <td><a href="/admin/quotations/{{ q.id }}">{{ q.quotation_number }}</a></td>
+        <td>{{ q.customer_name }}</td>
+        <td class="text-muted">{{ q.created_at.strftime('%d %b %Y') }}</td>
+        <td>₹{{ "%.2f"|format(q.total) }}</td>
+        <td>
+          {% if q.status == 'Accepted' %}<span class="badge badge--success">{{ q.status }}</span>
+          {% elif q.status in ('Rejected', 'Expired') %}<span class="badge badge--danger">{{ q.status }}</span>
+          {% elif q.status == 'Converted' %}<span class="badge badge--info">{{ q.status }}</span>
+          {% else %}<span class="badge badge--muted">{{ q.status }}</span>{% endif %}
+        </td>
+        <td>
+          <a class="btn btn-sm btn-secondary" href="/admin/quotations/{{ q.id }}">View</a>
+          <a class="btn btn-sm btn-secondary" href="/admin/quotations/{{ q.id }}/edit">Edit</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state"><h3>No quotations yet.</h3><p>Create one to send a priced proposal to a customer.</p></div>
+{% endif %}
+{% endblock %}
