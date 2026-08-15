@@ -15,32 +15,36 @@
 
   {% if categories %}
   <section class="page-section">
-    <h2 class="section-title">Shop by Category</h2>
-    <div class="category-scroll">
-      {% for cat in categories %}
-      <a class="category-chip" href="/category/{{ cat.slug }}">
-        <span class="category-chip__img">
-          {% if cat.image %}<img src="{{ cat.image }}" alt="">{% else %}🎁{% endif %}
-        </span>
-        {{ cat.name }}
-      </a>
-      {% endfor %}
+    <div class="section-tinted">
+      <h2 class="section-title">🗂️ Shop by Category</h2>
+      <div class="category-scroll">
+        {% for cat in categories %}
+        <a class="category-chip" href="/category/{{ cat.slug }}">
+          <span class="category-chip__img">
+            {% if cat.image %}<img src="{{ cat.image }}" alt="">{% else %}🎁{% endif %}
+          </span>
+          {{ cat.name }}
+        </a>
+        {% endfor %}
+      </div>
     </div>
   </section>
   {% endif %}
 
   {% if occasions %}
   <section class="page-section">
-    <h2 class="section-title">Shop by Occasion</h2>
-    <div class="category-scroll">
-      {% for occ in occasions %}
-      <a class="category-chip" href="/occasion/{{ occ.slug }}">
-        <span class="category-chip__img">
-          {% if occ.image %}<img src="{{ occ.image }}" alt="">{% else %}🎉{% endif %}
-        </span>
-        {{ occ.name }}
-      </a>
-      {% endfor %}
+    <div class="section-tinted">
+      <h2 class="section-title">🎉 Shop by Occasion</h2>
+      <div class="category-scroll">
+        {% for occ in occasions %}
+        <a class="category-chip" href="/occasion/{{ occ.slug }}">
+          <span class="category-chip__img">
+            {% if occ.image %}<img src="{{ occ.image }}" alt="">{% else %}🎉{% endif %}
+          </span>
+          {{ occ.name }}
+        </a>
+        {% endfor %}
+      </div>
     </div>
   </section>
   {% endif %}
@@ -56,8 +60,8 @@
   {% if featured %}
   <section class="page-section">
     <div class="section-title--row">
-      <h2 class="section-title mb-0">Featured Products</h2>
-      <a href="/shop">See all</a>
+      <h2 class="section-title mb-0">🌟 Featured Products</h2>
+      <a href="/shop" class="section-link">See all</a>
     </div>
     <div class="product-grid">
       {% for p in featured %}{{ cards.product_card(p) }}{% endfor %}
@@ -68,8 +72,8 @@
   {% if new_arrivals %}
   <section class="page-section">
     <div class="section-title--row">
-      <h2 class="section-title mb-0">New Arrivals</h2>
-      <a href="/shop?sort=newest">See all</a>
+      <h2 class="section-title mb-0">✨ New Arrivals</h2>
+      <a href="/shop?sort=newest" class="section-link">See all</a>
     </div>
     <div class="product-grid">
       {% for p in new_arrivals %}{{ cards.product_card(p) }}{% endfor %}
@@ -80,8 +84,8 @@
   {% if bestsellers %}
   <section class="page-section">
     <div class="section-title--row">
-      <h2 class="section-title mb-0">Best Sellers</h2>
-      <a href="/shop">See all</a>
+      <h2 class="section-title mb-0">🏆 Best Sellers</h2>
+      <a href="/shop" class="section-link">See all</a>
     </div>
     <div class="product-grid">
       {% for p in bestsellers %}{{ cards.product_card(p) }}{% endfor %}
@@ -92,8 +96,8 @@
   {% if special_offers %}
   <section class="page-section">
     <div class="section-title--row">
-      <h2 class="section-title mb-0">Special Offers</h2>
-      <a href="/shop">See all</a>
+      <h2 class="section-title mb-0">🔥 Special Offers</h2>
+      <a href="/shop" class="section-link">See all</a>
     </div>
     <div class="product-grid">
       {% for p in special_offers %}{{ cards.product_card(p) }}{% endfor %}
