@@ -15,7 +15,7 @@ from tests.helpers import checkout_cookies, checkout_payload, make_customer, mak
 def _login_as_admin(client: TestClient, email: str) -> None:
     db = SessionLocal()
     if not db.query(Admin).filter(Admin.email == email).first():
-        db.add(Admin(name="Test Admin", email=email, password_hash=hash_password("testpass123"), role="owner"))
+        db.add(Admin(name="Test Admin", email=email, password_hash=hash_password("testpass123"), role="super_admin"))
         db.commit()
     db.close()
     response = client.post("/admin/login", data={"email": email, "password": "testpass123"}, follow_redirects=False)

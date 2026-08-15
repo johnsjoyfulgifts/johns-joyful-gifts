@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Form, Request, UploadFile
 from fastapi import File as FastAPIFile
@@ -8,10 +8,16 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.audit import log_activity
 from app.auth import (
+    ADMIN_ROLES,
+    ROLE_LABELS,
+    ROLE_ORDER_MANAGER,
+    ROLE_PRODUCT_MANAGER,
+    ROLE_SUPER_ADMIN,
     clear_session_cookie,
     get_current_admin,
     hash_password,
     require_admin,
+    require_role,
     set_session_cookie,
     verify_password,
 )
@@ -31,6 +37,7 @@ from app.models import (
     OrderStatus,
     OrderStatusHistory,
     Product,
+    ProductEvent,
     ProductImage,
     Review,
     now_utc,
@@ -47,6 +54,13 @@ router = APIRouter(prefix="/admin")
 ORDER_STATUSES = [s.value for s in OrderStatus]
 MIN_PRODUCT_IMAGES = 4
 MAX_PRODUCT_IMAGES = 6
+
+# Section-scoped access: Super Admin always passes require_role(...)
+# regardless of which roles are listed. require_super_admin lists none, so
+# only Super Admin gets through.
+require_product_admin = require_role(ROLE_PRODUCT_MANAGER)
+require_order_admin = require_role(ROLE_ORDER_MANAGER)
+require_super_admin = require_role()
 
 
 # ---------- Auth ----------
@@ -197,13 +211,13 @@ def dashboard(request: Request, db: Session = Depends(get_db), admin: Admin = De
 # ---------- Categories ----------
 
 @router.get("/categories")
-def categories_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def categories_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     categories = db.query(Category).order_by(Category.sort_order, Category.name).all()
     return render_admin(request, "admin/categories_list.html", {"active_nav": "categories", "categories": categories}, db)
 
 
 @router.get("/categories/new")
-def category_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def category_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     return render_admin(request, "admin/category_form.html", {"active_nav": "categories", "category": None}, db)
 
 
@@ -215,7 +229,7 @@ def category_new_submit(
     active: bool = Form(False),
     image: UploadFile = FastAPIFile(default=None),
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_product_admin),
 ):
     name = name.strip()
     if not name:
@@ -239,7 +253,7 @@ def category_new_submit(
 
 
 @router.get("/categories/{category_id}/edit")
-def category_edit_page(category_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def category_edit_page(category_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     category = db.get(Category, category_id)
     if category is None:
         return RedirectResponse(url="/admin/categories", status_code=303)
@@ -255,7 +269,7 @@ def category_edit_submit(
     active: bool = Form(False),
     image: UploadFile = FastAPIFile(default=None),
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_product_admin),
 ):
     category = db.get(Category, category_id)
     if category is None:
@@ -288,7 +302,7 @@ def category_edit_submit(
 
 
 @router.post("/categories/{category_id}/delete")
-def category_delete(category_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def category_delete(category_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     category = db.get(Category, category_id)
     if category is not None:
         db.delete(category)
@@ -299,7 +313,7 @@ def category_delete(category_id: int, db: Session = Depends(get_db), admin: Admi
 # ---------- Collections (Occasions & Festivals) ----------
 
 @router.get("/collections")
-def collections_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def collections_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     collections = db.query(Collection).order_by(Collection.sort_order, Collection.name).all()
     counts = dict(
         db.query(product_collections.c.collection_id, func.count(product_collections.c.product_id))
@@ -315,7 +329,7 @@ def collections_list(request: Request, db: Session = Depends(get_db), admin: Adm
 
 
 @router.get("/collections/new")
-def collection_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def collection_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     return render_admin(request, "admin/collection_form.html", {"active_nav": "collections", "collection": None}, db)
 
 
@@ -328,7 +342,7 @@ def collection_new_submit(
     active: bool = Form(False),
     image: UploadFile = FastAPIFile(default=None),
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_product_admin),
 ):
     name = name.strip()
     if not name:
@@ -360,7 +374,7 @@ def collection_new_submit(
 
 
 @router.get("/collections/{collection_id}/edit")
-def collection_edit_page(collection_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def collection_edit_page(collection_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     collection = db.get(Collection, collection_id)
     if collection is None:
         return RedirectResponse(url="/admin/collections", status_code=303)
@@ -377,7 +391,7 @@ def collection_edit_submit(
     active: bool = Form(False),
     image: UploadFile = FastAPIFile(default=None),
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_product_admin),
 ):
     collection = db.get(Collection, collection_id)
     if collection is None:
@@ -412,7 +426,7 @@ def collection_edit_submit(
 
 
 @router.post("/collections/{collection_id}/delete")
-def collection_delete(collection_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def collection_delete(collection_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     collection = db.get(Collection, collection_id)
     if collection is not None:
         name = collection.name
@@ -432,7 +446,7 @@ def products_list(
     status: str = "",
     page: int = 1,
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_product_admin),
 ):
     query = db.query(Product).filter(Product.deleted_at.is_(None))
     if q:
@@ -484,7 +498,7 @@ def _product_form_context(db: Session, product=None, error=None) -> dict:
 
 
 @router.get("/products/new")
-def product_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def product_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     return render_admin(request, "admin/product_form.html", _product_form_context(db), db)
 
 
@@ -506,7 +520,7 @@ async def product_new_submit(
     collection_ids: list[int] = Form(default=[]),
     images: list[UploadFile] = FastAPIFile(default=[]),
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_product_admin),
 ):
     name = name.strip()
     sku = sku.strip().upper() or None
@@ -572,7 +586,7 @@ async def product_new_submit(
 
 
 @router.get("/products/{product_id}/edit")
-def product_edit_page(product_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def product_edit_page(product_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     product = db.query(Product).options(joinedload(Product.images)).filter(Product.id == product_id).first()
     if product is None:
         return RedirectResponse(url="/admin/products", status_code=303)
@@ -600,7 +614,7 @@ async def product_edit_submit(
     images: list[UploadFile] = FastAPIFile(default=[]),
     image_order: str = Form(""),
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_product_admin),
 ):
     product = db.query(Product).options(joinedload(Product.images), joinedload(Product.collections)).filter(Product.id == product_id).first()
     if product is None:
@@ -690,7 +704,7 @@ async def product_edit_submit(
 
 
 @router.post("/products/{product_id}/delete")
-def product_delete(product_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def product_delete(product_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     """Soft delete: images and the row itself are kept (so it can be
     restored exactly as it was) — only hidden from every customer-facing
     and normal admin view. Use /delete-permanent for a real, irreversible
@@ -705,13 +719,13 @@ def product_delete(product_id: int, db: Session = Depends(get_db), admin: Admin 
 
 
 @router.get("/products/deleted")
-def products_deleted_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def products_deleted_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     products = db.query(Product).filter(Product.deleted_at.isnot(None)).order_by(Product.deleted_at.desc()).all()
     return render_admin(request, "admin/products_deleted.html", {"active_nav": "products", "products": products}, db)
 
 
 @router.post("/products/{product_id}/restore")
-def product_restore(product_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def product_restore(product_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     product = db.get(Product, product_id)
     if product is not None and product.deleted_at is not None:
         product.deleted_at = None
@@ -722,7 +736,7 @@ def product_restore(product_id: int, db: Session = Depends(get_db), admin: Admin
 
 
 @router.post("/products/{product_id}/delete-permanent")
-def product_delete_permanent(product_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def product_delete_permanent(product_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     product = db.query(Product).options(joinedload(Product.images)).filter(Product.id == product_id).first()
     if product is not None and product.deleted_at is not None:
         name = product.name
@@ -735,7 +749,7 @@ def product_delete_permanent(product_id: int, db: Session = Depends(get_db), adm
 
 
 @router.post("/products/{product_id}/duplicate")
-def product_duplicate(product_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def product_duplicate(product_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     original = db.query(Product).options(joinedload(Product.images)).filter(Product.id == product_id).first()
     if original is None:
         return RedirectResponse(url="/admin/products", status_code=303)
@@ -767,7 +781,7 @@ def product_duplicate(product_id: int, db: Session = Depends(get_db), admin: Adm
 
 
 @router.post("/products/{product_id}/toggle-active")
-def product_toggle_active(product_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def product_toggle_active(product_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     product = db.get(Product, product_id)
     if product is not None:
         product.active = not product.active
@@ -778,7 +792,7 @@ def product_toggle_active(product_id: int, db: Session = Depends(get_db), admin:
 # ---------- Settings ----------
 
 @router.get("/settings")
-def settings_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def settings_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_super_admin)):
     values = get_all_settings(db)
     return render_admin(
         request,
@@ -818,7 +832,7 @@ def settings_submit(
     bank_ifsc: str = Form(""),
     bank_name: str = Form(""),
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_super_admin),
 ):
     old_values = get_all_settings(db)
     new_values = {
@@ -857,16 +871,132 @@ def settings_submit(
     return RedirectResponse(url="/admin/settings", status_code=303)
 
 
+# ---------- Admin Users ----------
+
+def _admin_form_context(admin_user=None, error=None) -> dict:
+    return {"active_nav": "admins", "admin_user": admin_user, "error": error, "roles": ADMIN_ROLES, "role_labels": ROLE_LABELS}
+
+
+@router.get("/admins")
+def admins_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_super_admin)):
+    admins = db.query(Admin).order_by(Admin.created_at).all()
+    return render_admin(
+        request, "admin/admins_list.html", {"active_nav": "admins", "admins": admins, "role_labels": ROLE_LABELS}, db
+    )
+
+
+@router.get("/admins/new")
+def admin_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_super_admin)):
+    return render_admin(request, "admin/admin_form.html", _admin_form_context(), db)
+
+
+@router.post("/admins/new")
+def admin_new_submit(
+    request: Request,
+    name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    role: str = Form(ROLE_PRODUCT_MANAGER),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(require_super_admin),
+):
+    name = name.strip()
+    email = email.strip().lower()
+    error = None
+    if not name:
+        error = "Name is required."
+    elif not email:
+        error = "Email is required."
+    elif role not in ADMIN_ROLES:
+        error = "Invalid role."
+    elif len(password) < 8:
+        error = "Password must be at least 8 characters."
+    elif db.query(Admin).filter(Admin.email == email).first() is not None:
+        error = "An admin with that email already exists."
+
+    if error:
+        return render_admin(request, "admin/admin_form.html", _admin_form_context(error=error), db, status_code=400)
+
+    new_admin = Admin(name=name, email=email, password_hash=hash_password(password), role=role)
+    db.add(new_admin)
+    db.flush()
+    log_activity(db, admin, "admin.created", f"Created admin '{name}' ({email}) as {ROLE_LABELS[role]}", "admin", new_admin.id)
+    db.commit()
+    return RedirectResponse(url="/admin/admins", status_code=303)
+
+
+@router.get("/admins/{admin_id}/edit")
+def admin_edit_page(admin_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_super_admin)):
+    admin_user = db.get(Admin, admin_id)
+    if admin_user is None:
+        return RedirectResponse(url="/admin/admins", status_code=303)
+    return render_admin(request, "admin/admin_form.html", _admin_form_context(admin_user=admin_user), db)
+
+
+@router.post("/admins/{admin_id}/edit")
+def admin_edit_submit(
+    admin_id: int,
+    request: Request,
+    name: str = Form(...),
+    role: str = Form(...),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(require_super_admin),
+):
+    admin_user = db.get(Admin, admin_id)
+    if admin_user is None:
+        return RedirectResponse(url="/admin/admins", status_code=303)
+
+    name = name.strip()
+    error = None
+    if not name:
+        error = "Name is required."
+    elif role not in ADMIN_ROLES:
+        error = "Invalid role."
+    elif admin_user.id == admin.id and role != ROLE_SUPER_ADMIN:
+        error = "You can't demote your own account — ask another Super Admin to change it."
+    elif admin_user.role == ROLE_SUPER_ADMIN and role != ROLE_SUPER_ADMIN:
+        remaining_super_admins = db.query(Admin).filter(Admin.role == ROLE_SUPER_ADMIN, Admin.id != admin_user.id).count()
+        if remaining_super_admins == 0:
+            error = "There must always be at least one Super Admin."
+
+    if error:
+        return render_admin(request, "admin/admin_form.html", _admin_form_context(admin_user=admin_user, error=error), db, status_code=400)
+
+    admin_user.name = name
+    admin_user.role = role
+    log_activity(db, admin, "admin.updated", f"Updated admin '{name}' to {ROLE_LABELS[role]}", "admin", admin_user.id)
+    db.commit()
+    return RedirectResponse(url="/admin/admins", status_code=303)
+
+
+@router.post("/admins/{admin_id}/delete")
+def admin_delete(admin_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_super_admin)):
+    admin_user = db.get(Admin, admin_id)
+    if admin_user is None:
+        return RedirectResponse(url="/admin/admins", status_code=303)
+    if admin_user.id == admin.id:
+        return RedirectResponse(url="/admin/admins?error=self", status_code=303)
+    if admin_user.role == ROLE_SUPER_ADMIN:
+        remaining_super_admins = db.query(Admin).filter(Admin.role == ROLE_SUPER_ADMIN, Admin.id != admin_user.id).count()
+        if remaining_super_admins == 0:
+            return RedirectResponse(url="/admin/admins?error=last_super_admin", status_code=303)
+    name = admin_user.name
+    db.delete(admin_user)
+    log_activity(db, admin, "admin.deleted", f"Deleted admin '{name}'")
+    db.commit()
+    return RedirectResponse(url="/admin/admins", status_code=303)
+
+
 # ---------- Backup ----------
 
 @router.get("/backup")
-def backup_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def backup_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_super_admin)):
     values = get_all_settings(db)
     return render_admin(request, "admin/backup.html", {"active_nav": "backup", "last_backup_at": values.get("last_backup_at", "")}, db)
 
 
 @router.get("/backup/download")
-def backup_download(db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def backup_download(db: Session = Depends(get_db), admin: Admin = Depends(require_super_admin)):
     data = build_backup(db)
     set_settings(db, {"last_backup_at": data["exported_at"]})
 
@@ -880,7 +1010,7 @@ ACTIVITY_LOG_PAGE_SIZE = 50
 
 
 @router.get("/activity-log")
-def activity_log_page(request: Request, page: int = 1, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def activity_log_page(request: Request, page: int = 1, db: Session = Depends(get_db), admin: Admin = Depends(require_super_admin)):
     page = max(page, 1)
     query = db.query(AuditLog).order_by(AuditLog.created_at.desc())
     total = query.count()
@@ -895,6 +1025,56 @@ def activity_log_page(request: Request, page: int = 1, db: Session = Depends(get
             "total": total,
             "page": page,
             "total_pages": total_pages,
+        },
+        db,
+    )
+
+
+# ---------- Analytics ----------
+
+ANALYTICS_PERIODS = (7, 30, 90)
+
+
+@router.get("/analytics")
+def analytics_page(request: Request, days: int = 30, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    days = days if days in ANALYTICS_PERIODS else 30
+    cutoff = now_utc() - timedelta(days=days)
+
+    rows = (
+        db.query(ProductEvent.product_id, ProductEvent.event_type, func.count(ProductEvent.id))
+        .filter(ProductEvent.created_at >= cutoff)
+        .group_by(ProductEvent.product_id, ProductEvent.event_type)
+        .all()
+    )
+
+    counts_by_product: dict[int, dict[str, int]] = {}
+    for product_id, event_type, count in rows:
+        counts_by_product.setdefault(product_id, {"view": 0, "enquiry": 0, "add_to_cart": 0})[event_type] = count
+
+    products_by_id = {}
+    if counts_by_product:
+        products_by_id = {p.id: p for p in db.query(Product).filter(Product.id.in_(counts_by_product.keys())).all()}
+
+    breakdown = []
+    totals = {"view": 0, "enquiry": 0, "add_to_cart": 0}
+    for product_id, counts in counts_by_product.items():
+        for key in totals:
+            totals[key] += counts[key]
+        product = products_by_id.get(product_id)
+        if product is None:
+            continue  # events for a since-hard-deleted product — nothing left to show a name for
+        breakdown.append({"product": product, **counts, "total": sum(counts.values())})
+    breakdown.sort(key=lambda row: row["total"], reverse=True)
+
+    return render_admin(
+        request,
+        "admin/analytics.html",
+        {
+            "active_nav": "analytics",
+            "days": days,
+            "periods": ANALYTICS_PERIODS,
+            "breakdown": breakdown,
+            "totals": totals,
         },
         db,
     )
@@ -917,13 +1097,13 @@ def _coupon_form_context(coupon=None, error=None) -> dict:
 
 
 @router.get("/coupons")
-def coupons_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def coupons_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_order_admin)):
     coupons = db.query(Coupon).order_by(Coupon.created_at.desc()).all()
     return render_admin(request, "admin/coupons_list.html", {"active_nav": "coupons", "coupons": coupons}, db)
 
 
 @router.get("/coupons/new")
-def coupon_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def coupon_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_order_admin)):
     return render_admin(request, "admin/coupon_form.html", _coupon_form_context(), db)
 
 
@@ -955,7 +1135,7 @@ def coupon_new_submit(
     expires_at: str = Form(""),
     active: bool = Form(True),
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_order_admin),
 ):
     code = code.strip().upper()
     error = _validate_coupon_form(db, code, discount_type, discount_value, exclude_id=None)
@@ -977,7 +1157,7 @@ def coupon_new_submit(
 
 
 @router.get("/coupons/{coupon_id}/edit")
-def coupon_edit_page(coupon_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def coupon_edit_page(coupon_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_order_admin)):
     coupon = db.get(Coupon, coupon_id)
     if coupon is None:
         return RedirectResponse(url="/admin/coupons", status_code=303)
@@ -996,7 +1176,7 @@ def coupon_edit_submit(
     expires_at: str = Form(""),
     active: bool = Form(True),
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_order_admin),
 ):
     coupon = db.get(Coupon, coupon_id)
     if coupon is None:
@@ -1019,7 +1199,7 @@ def coupon_edit_submit(
 
 
 @router.post("/coupons/{coupon_id}/delete")
-def coupon_delete(coupon_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def coupon_delete(coupon_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_order_admin)):
     coupon = db.get(Coupon, coupon_id)
     if coupon is not None:
         db.delete(coupon)
@@ -1034,13 +1214,13 @@ def _gift_option_form_context(gift_option=None, error=None) -> dict:
 
 
 @router.get("/gift-options")
-def gift_options_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def gift_options_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     gift_options = db.query(GiftOption).order_by(GiftOption.sort_order, GiftOption.name).all()
     return render_admin(request, "admin/gift_options_list.html", {"active_nav": "gift-options", "gift_options": gift_options}, db)
 
 
 @router.get("/gift-options/new")
-def gift_option_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def gift_option_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     return render_admin(request, "admin/gift_option_form.html", _gift_option_form_context(), db)
 
 
@@ -1052,7 +1232,7 @@ def gift_option_new_submit(
     sort_order: int = Form(0),
     active: bool = Form(True),
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_product_admin),
 ):
     name = name.strip()
     error = None
@@ -1072,7 +1252,7 @@ def gift_option_new_submit(
 
 
 @router.get("/gift-options/{gift_option_id}/edit")
-def gift_option_edit_page(gift_option_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def gift_option_edit_page(gift_option_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     gift_option = db.get(GiftOption, gift_option_id)
     if gift_option is None:
         return RedirectResponse(url="/admin/gift-options", status_code=303)
@@ -1088,7 +1268,7 @@ def gift_option_edit_submit(
     sort_order: int = Form(0),
     active: bool = Form(True),
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_product_admin),
 ):
     gift_option = db.get(GiftOption, gift_option_id)
     if gift_option is None:
@@ -1114,7 +1294,7 @@ def gift_option_edit_submit(
 
 
 @router.post("/gift-options/{gift_option_id}/delete")
-def gift_option_delete(gift_option_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def gift_option_delete(gift_option_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     gift_option = db.get(GiftOption, gift_option_id)
     if gift_option is not None:
         name = gift_option.name
@@ -1131,7 +1311,7 @@ def reviews_list(
     request: Request,
     status: str = "",
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_product_admin),
 ):
     query = db.query(Review).options(joinedload(Review.product), joinedload(Review.customer))
     if status == "pending":
@@ -1149,7 +1329,7 @@ def reviews_list(
 
 
 @router.post("/reviews/{review_id}/approve")
-def review_approve(review_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def review_approve(review_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     review = db.get(Review, review_id)
     if review is not None:
         review.approved = True
@@ -1158,7 +1338,7 @@ def review_approve(review_id: int, db: Session = Depends(get_db), admin: Admin =
 
 
 @router.post("/reviews/{review_id}/hide")
-def review_hide(review_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def review_hide(review_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     review = db.get(Review, review_id)
     if review is not None:
         review.approved = False
@@ -1167,7 +1347,7 @@ def review_hide(review_id: int, db: Session = Depends(get_db), admin: Admin = De
 
 
 @router.post("/reviews/{review_id}/delete")
-def review_delete(review_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def review_delete(review_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
     review = db.get(Review, review_id)
     if review is not None:
         db.delete(review)
@@ -1190,7 +1370,7 @@ def enquiries_list(
     request: Request,
     status: str = "",
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_order_admin),
 ):
     query = db.query(Enquiry).options(joinedload(Enquiry.product))
     if status in ENQUIRY_STATUSES:
@@ -1205,7 +1385,7 @@ def enquiries_list(
 
 
 @router.get("/enquiries/new")
-def enquiry_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def enquiry_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_order_admin)):
     return render_admin(request, "admin/enquiry_form.html", _enquiry_form_context(db), db)
 
 
@@ -1219,7 +1399,7 @@ def enquiry_new_submit(
     status: str = Form("New"),
     notes: str = Form(""),
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_order_admin),
 ):
     customer_name = customer_name.strip()
     customer_phone = customer_phone.strip()
@@ -1247,7 +1427,7 @@ def enquiry_new_submit(
 
 
 @router.get("/enquiries/{enquiry_id}/edit")
-def enquiry_edit_page(enquiry_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def enquiry_edit_page(enquiry_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_order_admin)):
     enquiry = db.get(Enquiry, enquiry_id)
     if enquiry is None:
         return RedirectResponse(url="/admin/enquiries", status_code=303)
@@ -1265,7 +1445,7 @@ def enquiry_edit_submit(
     status: str = Form("New"),
     notes: str = Form(""),
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_order_admin),
 ):
     enquiry = db.get(Enquiry, enquiry_id)
     if enquiry is None:
@@ -1299,7 +1479,7 @@ def enquiry_edit_submit(
 
 
 @router.post("/enquiries/{enquiry_id}/delete")
-def enquiry_delete(enquiry_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def enquiry_delete(enquiry_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_order_admin)):
     enquiry = db.get(Enquiry, enquiry_id)
     if enquiry is not None:
         db.delete(enquiry)
@@ -1316,7 +1496,7 @@ def orders_list(
     status: str = "",
     page: int = 1,
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_order_admin),
 ):
     query = db.query(Order).options(joinedload(Order.customer))
     if status:
@@ -1351,7 +1531,7 @@ def orders_list(
 
 
 @router.get("/orders/{order_number}")
-def order_detail(order_number: str, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+def order_detail(order_number: str, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_order_admin)):
     order = (
         db.query(Order)
         .options(joinedload(Order.items), joinedload(Order.customer), joinedload(Order.status_history))
@@ -1373,7 +1553,7 @@ def order_update_status(
     order_number: str,
     status: str = Form(...),
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_order_admin),
 ):
     order = db.query(Order).options(joinedload(Order.items)).filter(Order.order_number == order_number).first()
     if order is not None and status in ORDER_STATUSES and status != order.order_status:
@@ -1400,7 +1580,7 @@ def order_update_status(
 def order_mark_paid(
     order_number: str,
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_order_admin),
 ):
     """Manual payment methods (UPI/bank transfer) have no automated
     verification — this is the admin confirming, after checking their own
@@ -1421,7 +1601,7 @@ def order_update_courier(
     estimated_delivery: str = Form(""),
     notes: str = Form(""),
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_order_admin),
 ):
     order = db.query(Order).filter(Order.order_number == order_number).first()
     if order is not None:
@@ -1442,7 +1622,7 @@ def customer_reset_password(
     request: Request,
     new_password: str = Form(...),
     db: Session = Depends(get_db),
-    admin: Admin = Depends(require_admin),
+    admin: Admin = Depends(require_order_admin),
 ):
     """
     There's no self-service password reset (would need a paid SMS/email

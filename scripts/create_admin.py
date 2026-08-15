@@ -49,7 +49,7 @@ def main():
             print("Passwords didn't match.")
             return
 
-        admin = Admin(name=name, email=email, password_hash=hash_password(password), role="owner")
+        admin = Admin(name=name, email=email, password_hash=hash_password(password), role="super_admin")
         db.add(admin)
         db.commit()
         print(f"Admin account created for {email}. You can now log in at /admin/login.")

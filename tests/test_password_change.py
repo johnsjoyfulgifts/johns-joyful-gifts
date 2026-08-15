@@ -15,7 +15,7 @@ from tests.helpers import make_customer
 
 
 def _make_admin(db, email, password="originalpass1"):
-    admin = Admin(name="Test Admin", email=email, password_hash=admin_hash_password(password), role="owner")
+    admin = Admin(name="Test Admin", email=email, password_hash=admin_hash_password(password), role="super_admin")
     db.add(admin)
     db.commit()
     db.refresh(admin)

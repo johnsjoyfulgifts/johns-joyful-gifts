@@ -1,0 +1,40 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Admin Users — Admin{% endblock %}
+{% block page_title %}Admin Users{% endblock %}
+
+{% block admin_content %}
+{% if request.query_params.get('error') == 'self' %}
+<div class="alert alert--error">You can't delete your own account.</div>
+{% elif request.query_params.get('error') == 'last_super_admin' %}
+<div class="alert alert--error">There must always be at least one Super Admin.</div>
+{% endif %}
+
+<div class="flex justify-between items-center" style="margin-bottom:14px;">
+  <span class="text-muted">{{ admins|length }} admin{{ '' if admins|length == 1 else 's' }}</span>
+  <a class="btn btn-primary btn-sm" href="/admin/admins/new">+ Add Admin</a>
+</div>
+<p class="text-muted" style="font-size:0.85rem; margin-top:-8px;">Super Admin has full access. Product Manager covers products, categories, occasions, gift options, and reviews. Order &amp; Enquiry Manager covers orders, WhatsApp enquiries, coupons, and customer accounts.</p>
+
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for a in admins %}
+      <tr>
+        <td>{{ a.name }}{% if current_admin and a.id == current_admin.id %} <span class="text-muted">(you)</span>{% endif %}</td>
+        <td class="text-muted">{{ a.email }}</td>
+        <td><span class="badge {{ 'badge--success' if a.role == 'super_admin' else 'badge--info' }}">{{ role_labels.get(a.role, a.role) }}</span></td>
+        <td>
+          <a class="btn btn-sm btn-secondary" href="/admin/admins/{{ a.id }}/edit">Edit</a>
+          {% if not current_admin or a.id != current_admin.id %}
+          <form method="post" action="/admin/admins/{{ a.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this admin account?');">
+            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

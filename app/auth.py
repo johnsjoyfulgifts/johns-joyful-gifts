@@ -15,6 +15,20 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SESSION_COOKIE_NAME = "jjg_admin_session"
 SESSION_MAX_AGE_SECONDS = 60 * 60 * 8  # 8 hours
 
+# Super Admin can always do everything (checked explicitly below, not just
+# listed per-route) — Product Manager and Order/Enquiry Manager are scoped
+# to their area. Every admin created before roles existed keeps working:
+# see the "owner" -> "super_admin" data migration.
+ROLE_SUPER_ADMIN = "super_admin"
+ROLE_PRODUCT_MANAGER = "product_manager"
+ROLE_ORDER_MANAGER = "order_enquiry_manager"
+ADMIN_ROLES = (ROLE_SUPER_ADMIN, ROLE_PRODUCT_MANAGER, ROLE_ORDER_MANAGER)
+ROLE_LABELS = {
+    ROLE_SUPER_ADMIN: "Super Admin",
+    ROLE_PRODUCT_MANAGER: "Product Manager",
+    ROLE_ORDER_MANAGER: "Order & Enquiry Manager",
+}
+
 _serializer = URLSafeTimedSerializer(settings.secret_key, salt="admin-session")
 
 
@@ -81,3 +95,20 @@ def require_admin_api(request: Request, db: Session = Depends(get_db)) -> Admin:
     if admin is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Your session has expired. Please log in again.")
     return admin
+
+
+def require_role(*allowed_roles: str):
+    """Dependency factory: any of `allowed_roles` may proceed, and Super
+    Admin can always proceed regardless of what's listed — it's the one
+    role with no ceiling. Insufficient permission still requires being
+    logged in first (this wraps require_admin's own check via the same
+    session lookup), so it never leaks *whether* a page exists to a logged
+    -out visitor — they're sent to /admin/login exactly as before."""
+
+    def dependency(request: Request, db: Session = Depends(get_db)) -> Admin:
+        admin = require_admin(request, db)
+        if admin.role != ROLE_SUPER_ADMIN and admin.role not in allowed_roles:
+            raise HTTPException(status_code=status.HTTP_303_SEE_OTHER, headers={"Location": "/admin?denied=1"})
+        return admin
+
+    return dependency

@@ -48,11 +48,14 @@ def render(request, template_name: str, context: dict, db: Session, status_code:
 
 
 def render_admin(request, template_name: str, context: dict, db: Session, status_code: int = 200):
+    from app.auth import get_current_admin
+
     store = get_all_settings(db)
     full_context = {
         "request": request,
         "store": store,
         "current_year": datetime.now(timezone.utc).year,
+        "current_admin": get_current_admin(request, db),
         **context,
     }
     return templates.TemplateResponse(template_name, full_context, status_code=status_code)

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
+from app.analytics import log_event
 from app.cart_service import (
     cart_totals,
     clear_cart,
@@ -91,6 +92,7 @@ def api_add_to_cart(
     cart = read_cart(request)
     key = str(product_id)
     cart[key] = min(cart.get(key, 0) + max(quantity, 1), 20, product.stock)
+    log_event(db, product_id, "add_to_cart")
     return _respond(request, "/cart", cart, db)
 
 

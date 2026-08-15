@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
+from app.analytics import log_event
 from app.customer_auth import get_current_customer
 from app.database import get_db
 from app.models import Category, Collection, Product, Review
@@ -270,6 +271,8 @@ def product_detail(slug: str, request: Request, db: Session = Depends(get_db)):
     if product is None or not product.active or product.deleted_at is not None:
         return render(request, "errors/404.html", {}, db, status_code=404)
 
+    log_event(db, product.id, "view")
+
     # Cast a wider net than "same category alone": same collection (occasion)
     # or a similar price band both count as related too, then rank so the
     # closest matches (same category, closest price) surface first — all in
@@ -337,6 +340,15 @@ def product_detail(slug: str, request: Request, db: Session = Depends(get_db)):
         },
         db,
     )
+
+
+@router.post("/api/track/enquiry/{product_id}")
+def track_enquiry_click(product_id: int, db: Session = Depends(get_db)):
+    """Fired by a beacon when a customer clicks "Enquire on WhatsApp" — that
+    click opens wa.me in a new tab, so there's no server round trip to hook
+    into otherwise."""
+    log_event(db, product_id, "enquiry")
+    return JSONResponse({"ok": True})
 
 
 @router.get("/about")

@@ -108,9 +108,23 @@
         <p class="badge badge--success">In Stock</p>
       {% endif %}
 
-      <a class="btn btn-whatsapp btn-block" href="{{ product_whatsapp_link }}" target="_blank" rel="noopener" style="margin-bottom:10px;">
+      <a class="btn btn-whatsapp btn-block js-track-enquiry" data-product-id="{{ product.id }}" href="{{ product_whatsapp_link }}" target="_blank" rel="noopener" style="margin-bottom:10px;">
         {{ wa.whatsapp_icon(18) }} Enquire on WhatsApp
       </a>
+      <script>
+        (function () {
+          var link = document.querySelector('.js-track-enquiry');
+          if (!link) return;
+          link.addEventListener('click', function () {
+            var url = '/api/track/enquiry/' + link.getAttribute('data-product-id');
+            if (navigator.sendBeacon) {
+              navigator.sendBeacon(url);
+            } else {
+              fetch(url, { method: 'POST', keepalive: true });
+            }
+          });
+        })();
+      </script>
 
       <div class="flex items-center gap-8" style="margin-bottom:10px; position:relative;">
         <button type="button" class="wishlist-heart wishlist-heart--inline js-wishlist-toggle" data-product-id="{{ product.id }}" aria-label="Save to wishlist" aria-pressed="false">🤍</button>

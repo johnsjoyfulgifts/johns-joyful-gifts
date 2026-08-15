@@ -47,7 +47,7 @@ class Admin(Base):
     name: Mapped[str] = mapped_column(String(120))
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(String(30), default="owner")
+    role: Mapped[str] = mapped_column(String(30), default="super_admin")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
 
@@ -311,6 +311,21 @@ class Collection(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     products: Mapped[list["Product"]] = relationship(secondary=product_collections, back_populates="collections")
+
+
+class ProductEvent(Base):
+    """One row per lightweight engagement signal — product page view,
+    WhatsApp enquiry click, add-to-cart. No customer/session identifier is
+    stored (privacy-conscious: this is aggregate interest, not a visitor
+    profile), so events can only ever be counted, never tied back to a
+    person."""
+
+    __tablename__ = "product_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    event_type: Mapped[str] = mapped_column(String(20), index=True)  # "view" | "enquiry" | "add_to_cart"
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, index=True)
 
 
 class GiftOption(Base):

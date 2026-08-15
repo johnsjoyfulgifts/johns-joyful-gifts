@@ -18,19 +18,25 @@
         <img src="/static/icons/logo-icon.png" alt="" width="24" height="24" style="border-radius:50%; vertical-align:middle; margin-right:6px;">
         {{ store.store_name }}
       </div>
+      {% set role = current_admin.role if current_admin else '' %}
+      {% set is_super = role == 'super_admin' %}
+      {% set is_product = is_super or role == 'product_manager' %}
+      {% set is_order = is_super or role == 'order_enquiry_manager' %}
       <nav aria-label="Admin navigation">
         <a href="/admin" class="{{ 'active' if active_nav == 'dashboard' else '' }}">📊 Dashboard</a>
-        <a href="/admin/orders" class="{{ 'active' if active_nav == 'orders' else '' }}">📦 Orders <span id="new-order-badge"></span></a>
-        <a href="/admin/products" class="{{ 'active' if active_nav == 'products' else '' }}">🧸 Products</a>
-        <a href="/admin/categories" class="{{ 'active' if active_nav == 'categories' else '' }}">🗂️ Categories</a>
-        <a href="/admin/collections" class="{{ 'active' if active_nav == 'collections' else '' }}">🎉 Occasions</a>
-        <a href="/admin/coupons" class="{{ 'active' if active_nav == 'coupons' else '' }}">🏷️ Coupons</a>
-        <a href="/admin/gift-options" class="{{ 'active' if active_nav == 'gift-options' else '' }}">🎁 Gift Options</a>
-        <a href="/admin/reviews" class="{{ 'active' if active_nav == 'reviews' else '' }}">⭐ Reviews</a>
-        <a href="/admin/enquiries" class="{{ 'active' if active_nav == 'enquiries' else '' }}">💬 Enquiries</a>
-        <a href="/admin/backup" class="{{ 'active' if active_nav == 'backup' else '' }}">💾 Backup</a>
-        <a href="/admin/activity-log" class="{{ 'active' if active_nav == 'activity-log' else '' }}">📜 Activity Log</a>
-        <a href="/admin/settings" class="{{ 'active' if active_nav == 'settings' else '' }}">⚙️ Settings</a>
+        {% if is_order %}<a href="/admin/orders" class="{{ 'active' if active_nav == 'orders' else '' }}">📦 Orders <span id="new-order-badge"></span></a>{% endif %}
+        {% if is_product %}<a href="/admin/products" class="{{ 'active' if active_nav == 'products' else '' }}">🧸 Products</a>{% endif %}
+        {% if is_product %}<a href="/admin/categories" class="{{ 'active' if active_nav == 'categories' else '' }}">🗂️ Categories</a>{% endif %}
+        {% if is_product %}<a href="/admin/collections" class="{{ 'active' if active_nav == 'collections' else '' }}">🎉 Occasions</a>{% endif %}
+        {% if is_order %}<a href="/admin/coupons" class="{{ 'active' if active_nav == 'coupons' else '' }}">🏷️ Coupons</a>{% endif %}
+        {% if is_product %}<a href="/admin/gift-options" class="{{ 'active' if active_nav == 'gift-options' else '' }}">🎁 Gift Options</a>{% endif %}
+        {% if is_product %}<a href="/admin/reviews" class="{{ 'active' if active_nav == 'reviews' else '' }}">⭐ Reviews</a>{% endif %}
+        {% if is_order %}<a href="/admin/enquiries" class="{{ 'active' if active_nav == 'enquiries' else '' }}">💬 Enquiries</a>{% endif %}
+        {% if is_super %}<a href="/admin/backup" class="{{ 'active' if active_nav == 'backup' else '' }}">💾 Backup</a>{% endif %}
+        {% if is_super %}<a href="/admin/activity-log" class="{{ 'active' if active_nav == 'activity-log' else '' }}">📜 Activity Log</a>{% endif %}
+        <a href="/admin/analytics" class="{{ 'active' if active_nav == 'analytics' else '' }}">📈 Analytics</a>
+        {% if is_super %}<a href="/admin/admins" class="{{ 'active' if active_nav == 'admins' else '' }}">👤 Admin Users</a>{% endif %}
+        {% if is_super %}<a href="/admin/settings" class="{{ 'active' if active_nav == 'settings' else '' }}">⚙️ Settings</a>{% endif %}
         <a href="/admin/change-password" class="{{ 'active' if active_nav == 'change-password' else '' }}">🔑 Change Password</a>
         <a href="/admin/logout">🚪 Log Out</a>
         <a href="/" target="_blank" rel="noopener">🔗 View Store</a>

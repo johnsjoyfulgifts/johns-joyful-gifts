@@ -1,0 +1,46 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Analytics — Admin{% endblock %}
+{% block page_title %}Product Analytics{% endblock %}
+
+{% block admin_content %}
+<div class="flex gap-8" style="margin-bottom:14px;">
+  {% for p in periods %}
+  <a class="btn btn-sm {{ 'btn-primary' if days == p else 'btn-secondary' }}" href="/admin/analytics?days={{ p }}">Last {{ p }} days</a>
+  {% endfor %}
+</div>
+
+<div class="flex gap-12" style="flex-wrap:wrap; margin-bottom:20px;">
+  <div class="card" style="flex:1; min-width:140px;">
+    <p class="text-muted" style="margin:0; font-size:0.8rem;">Product Views</p>
+    <p style="font-size:1.6rem; font-weight:700; margin:4px 0 0;">{{ totals.view }}</p>
+  </div>
+  <div class="card" style="flex:1; min-width:140px;">
+    <p class="text-muted" style="margin:0; font-size:0.8rem;">WhatsApp Enquiries</p>
+    <p style="font-size:1.6rem; font-weight:700; margin:4px 0 0;">{{ totals.enquiry }}</p>
+  </div>
+  <div class="card" style="flex:1; min-width:140px;">
+    <p class="text-muted" style="margin:0; font-size:0.8rem;">Add to Cart</p>
+    <p style="font-size:1.6rem; font-weight:700; margin:4px 0 0;">{{ totals.add_to_cart }}</p>
+  </div>
+</div>
+
+{% if breakdown %}
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead><tr><th>Product</th><th>Views</th><th>Enquiries</th><th>Add to Cart</th></tr></thead>
+    <tbody>
+      {% for row in breakdown %}
+      <tr>
+        <td><a href="/admin/products/{{ row.product.id }}/edit">{{ row.product.name }}</a></td>
+        <td>{{ row.view }}</td>
+        <td>{{ row.enquiry }}</td>
+        <td>{{ row.add_to_cart }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state"><h3>No activity yet in this period.</h3><p>Views, WhatsApp enquiries, and add-to-cart taps will show up here as customers browse.</p></div>
+{% endif %}
+{% endblock %}
