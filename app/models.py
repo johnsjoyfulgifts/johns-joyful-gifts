@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
+    Column,
     DateTime,
     Enum,
     Float,
@@ -10,6 +11,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Table,
     Text,
     UniqueConstraint,
 )
@@ -63,6 +65,14 @@ class Category(Base):
     products: Mapped[list["Product"]] = relationship(back_populates="category")
 
 
+product_collections = Table(
+    "product_collections",
+    Base.metadata,
+    Column("product_id", ForeignKey("products.id", ondelete="CASCADE"), primary_key=True),
+    Column("collection_id", ForeignKey("collections.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
 class Product(Base):
     __tablename__ = "products"
 
@@ -94,6 +104,7 @@ class Product(Base):
     images: Mapped[list["ProductImage"]] = relationship(
         back_populates="product", cascade="all, delete-orphan", order_by="ProductImage.sort_order"
     )
+    collections: Mapped[list["Collection"]] = relationship(secondary=product_collections, back_populates="products")
 
     @property
     def discount_percent(self) -> int | None:
@@ -187,11 +198,16 @@ class Order(Base):
     stock_restored: Mapped[bool] = mapped_column(Boolean, default=False)
     gift_wrap: Mapped[bool] = mapped_column(Boolean, default=False)
     gift_message: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # Sum of the priced OrderGiftOption rows below — kept as its own column
+    # (rather than summed on read) so it's included directly in the order
+    # total the same way subtotal/delivery_charge/discount_amount are.
+    gift_charges: Mapped[float] = mapped_column(Float, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
     customer: Mapped["Customer"] = relationship(back_populates="orders")
     items: Mapped[list["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
+    gift_options: Mapped[list["OrderGiftOption"]] = relationship(back_populates="order", cascade="all, delete-orphan")
     status_history: Mapped[list["OrderStatusHistory"]] = relationship(
         back_populates="order", cascade="all, delete-orphan", order_by="OrderStatusHistory.created_at"
     )
@@ -209,6 +225,22 @@ class OrderItem(Base):
     subtotal: Mapped[float] = mapped_column(Float)
 
     order: Mapped["Order"] = relationship(back_populates="items")
+
+
+class OrderGiftOption(Base):
+    """Snapshot of one gift extra the customer added at checkout — its own
+    name/price, independent of the GiftOption row (which the admin may later
+    edit, deactivate, or delete), so past orders always show what was
+    actually charged."""
+
+    __tablename__ = "order_gift_options"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
+    name_snapshot: Mapped[str] = mapped_column(String(80))
+    price_snapshot: Mapped[float] = mapped_column(Float)
+
+    order: Mapped["Order"] = relationship(back_populates="gift_options")
 
 
 class OrderStatusHistory(Base):
@@ -258,6 +290,41 @@ class Coupon(Base):
     usage_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
     used_count: Mapped[int] = mapped_column(Integer, default=0)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+
+class Collection(Base):
+    """Admin-created occasion/festival groupings (e.g. Diwali, Birthday,
+    Wedding) that products can be tagged into — separate from Category,
+    which is the product's one structural department (Toys, Stationery...).
+    A product can belong to any number of collections."""
+
+    __tablename__ = "collections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    slug: Mapped[str] = mapped_column(String(140), unique=True, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+    products: Mapped[list["Product"]] = relationship(secondary=product_collections, back_populates="collections")
+
+
+class GiftOption(Base):
+    """Admin-managed catalog of paid add-ons offered at checkout (gift wrap,
+    greeting card, etc). Deleting one doesn't touch past orders — those keep
+    their own OrderGiftOption snapshot."""
+
+    __tablename__ = "gift_options"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(80))
+    price: Mapped[float] = mapped_column(Float)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
 

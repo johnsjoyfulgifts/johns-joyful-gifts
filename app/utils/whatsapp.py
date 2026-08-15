@@ -71,6 +71,11 @@ def order_confirmation_message(order: Order) -> str:
     ]
     for item in order.items:
         lines.append(f"- {item.product_name_snapshot} x{item.quantity} = Rs. {item.subtotal:.2f}")
+    if order.gift_options:
+        lines.append("")
+        lines.append("Gift extras:")
+        for opt in order.gift_options:
+            lines.append(f"- {opt.name_snapshot} = Rs. {opt.price_snapshot:.2f}")
     lines.append("")
     lines.append(f"Total: Rs. {order.total:.2f}")
     lines.append(f"Payment: {order.payment_method}")

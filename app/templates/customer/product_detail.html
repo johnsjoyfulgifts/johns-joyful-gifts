@@ -112,10 +112,61 @@
         {{ wa.whatsapp_icon(18) }} Enquire on WhatsApp
       </a>
 
-      <div class="flex items-center gap-8" style="margin-bottom:10px;">
+      <div class="flex items-center gap-8" style="margin-bottom:10px; position:relative;">
         <button type="button" class="wishlist-heart wishlist-heart--inline js-wishlist-toggle" data-product-id="{{ product.id }}" aria-label="Save to wishlist" aria-pressed="false">🤍</button>
         <span class="text-muted" style="font-size:0.85rem;">Save for later</span>
+        <button type="button" class="btn btn-sm btn-outline js-share-product" style="margin-left:auto;" data-url="{{ request.url.scheme }}://{{ request.url.netloc }}{{ request.url.path }}" data-title="{{ product.name }}" aria-haspopup="true" aria-expanded="false">
+          🔗 Share
+        </button>
+        <div class="js-share-menu" style="display:none; position:absolute; right:0; top:100%; z-index:20; background:var(--color-surface); border:1px solid var(--color-border); border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.12); padding:6px; min-width:170px;">
+          <button type="button" class="js-share-copy" style="display:block; width:100%; text-align:left; padding:8px 10px; border:none; background:none; cursor:pointer; font:inherit; border-radius:6px;">📋 Copy Link</button>
+          <a class="js-share-whatsapp" href="#" target="_blank" rel="noopener" style="display:block; width:100%; text-align:left; padding:8px 10px; border-radius:6px; text-decoration:none; color:inherit;">💬 Share on WhatsApp</a>
+        </div>
       </div>
+      <script>
+        (function () {
+          var btn = document.querySelector('.js-share-product');
+          if (!btn) return;
+          var url = btn.getAttribute('data-url');
+          var title = btn.getAttribute('data-title');
+          var menu = document.querySelector('.js-share-menu');
+
+          btn.addEventListener('click', async function () {
+            if (navigator.share) {
+              try { await navigator.share({ title: title, url: url }); } catch (e) { /* user cancelled */ }
+              return;
+            }
+            var open = menu.style.display === 'block';
+            menu.style.display = open ? 'none' : 'block';
+            btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+          });
+
+          document.addEventListener('click', function (e) {
+            if (menu && !menu.contains(e.target) && e.target !== btn) {
+              menu.style.display = 'none';
+              btn.setAttribute('aria-expanded', 'false');
+            }
+          });
+
+          var copyBtn = document.querySelector('.js-share-copy');
+          if (copyBtn) {
+            copyBtn.addEventListener('click', async function () {
+              try {
+                await navigator.clipboard.writeText(url);
+                copyBtn.textContent = '✓ Link Copied!';
+              } catch (e) {
+                copyBtn.textContent = 'Could not copy';
+              }
+              setTimeout(function () { copyBtn.textContent = '📋 Copy Link'; }, 1800);
+            });
+          }
+
+          var waLink = document.querySelector('.js-share-whatsapp');
+          if (waLink) {
+            waLink.href = 'https://wa.me/?text=' + encodeURIComponent(title + ' — ' + url);
+          }
+        })();
+      </script>
 
       {% if product.in_stock %}
       <form class="js-cart-form" action="/api/cart/add" method="post" data-reload-on-success="true" style="margin:18px 0;">

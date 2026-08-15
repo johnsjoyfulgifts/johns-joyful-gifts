@@ -5,6 +5,7 @@
 {% block content %}
 <div class="container page-section">
   <h1 class="section-title">{{ page_title }}</h1>
+  {% if page_description %}<p class="text-muted" style="margin-top:-8px;">{{ page_description }}</p>{% endif %}
 
   <form class="filter-bar filter-bar--shop" method="get" action="/shop">
     <input type="text" name="q" placeholder="Search products..." value="{{ filters.q }}" style="min-width:160px; flex:1;">

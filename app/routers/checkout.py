@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.cart_service import cart_totals, clear_cart, get_cart_lines, read_cart
 from app.customer_auth import require_customer, require_customer_api
 from app.database import get_db
-from app.models import Coupon, Customer, Order, OrderItem, OrderStatus, OrderStatusHistory, Product
+from app.models import Coupon, Customer, GiftOption, Order, OrderGiftOption, OrderItem, OrderStatus, OrderStatusHistory, Product
 from app.qr import generate_qr_png_bytes, upi_payment_uri
 from app.schemas import CheckoutRequest
 from app.settings_service import compute_delivery_charge, get_all_settings, get_setting, manual_payment_available
@@ -62,6 +62,7 @@ def checkout_page(request: Request, db: Session = Depends(get_db), customer: Cus
     lines = get_cart_lines(request, db)
     subtotal, item_count = cart_totals(lines)
     delivery_charge = compute_delivery_charge(db, subtotal) if lines else 0.0
+    gift_options = db.query(GiftOption).filter(GiftOption.active.is_(True)).order_by(GiftOption.sort_order).all()
     return render(
         request,
         "customer/checkout.html",
@@ -71,6 +72,7 @@ def checkout_page(request: Request, db: Session = Depends(get_db), customer: Cus
             "subtotal": subtotal,
             "item_count": item_count,
             "delivery_charge": delivery_charge,
+            "gift_options": gift_options,
             "total": round(subtotal + delivery_charge, 2),
             "manual_payment_available": manual_payment_available(db),
         },
@@ -182,7 +184,19 @@ async def api_checkout(
             coupon.used_count += 1
             applied_coupon_code = coupon.code
 
-        total = round(subtotal + delivery_charge - discount_amount, 2)
+        # Never trust client-supplied prices — re-price every selected gift
+        # option from the (still-active) catalog row.
+        selected_gift_options = []
+        gift_charges = 0.0
+        if checkout_data.gift_option_ids:
+            selected_gift_options = (
+                db.query(GiftOption)
+                .filter(GiftOption.id.in_(checkout_data.gift_option_ids), GiftOption.active.is_(True))
+                .all()
+            )
+            gift_charges = round(sum(opt.price for opt in selected_gift_options), 2)
+
+        total = round(subtotal + delivery_charge - discount_amount + gift_charges, 2)
 
         order = Order(
             order_number=generate_order_number(db),
@@ -205,9 +219,13 @@ async def api_checkout(
             idempotency_key=checkout_data.idempotency_key,
             gift_wrap=checkout_data.gift_wrap,
             gift_message=checkout_data.gift_message,
+            gift_charges=gift_charges,
         )
         db.add(order)
         db.flush()
+
+        for opt in selected_gift_options:
+            db.add(OrderGiftOption(order_id=order.id, name_snapshot=opt.name, price_snapshot=opt.price))
 
         for product, qty in order_items_data:
             db.add(

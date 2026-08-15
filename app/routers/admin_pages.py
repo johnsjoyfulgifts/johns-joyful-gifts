@@ -22,9 +22,11 @@ from app.models import (
     Admin,
     AuditLog,
     Category,
+    Collection,
     Coupon,
     Customer,
     Enquiry,
+    GiftOption,
     Order,
     OrderStatus,
     OrderStatusHistory,
@@ -32,6 +34,7 @@ from app.models import (
     ProductImage,
     Review,
     now_utc,
+    product_collections,
 )
 from app.settings_service import DEFAULTS, get_all_settings, get_setting, set_settings
 from app.storage import UploadValidationError, delete_product_image, save_product_image
@@ -293,6 +296,132 @@ def category_delete(category_id: int, db: Session = Depends(get_db), admin: Admi
     return RedirectResponse(url="/admin/categories", status_code=303)
 
 
+# ---------- Collections (Occasions & Festivals) ----------
+
+@router.get("/collections")
+def collections_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    collections = db.query(Collection).order_by(Collection.sort_order, Collection.name).all()
+    counts = dict(
+        db.query(product_collections.c.collection_id, func.count(product_collections.c.product_id))
+        .group_by(product_collections.c.collection_id)
+        .all()
+    )
+    return render_admin(
+        request,
+        "admin/collections_list.html",
+        {"active_nav": "collections", "collections": collections, "counts": counts},
+        db,
+    )
+
+
+@router.get("/collections/new")
+def collection_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    return render_admin(request, "admin/collection_form.html", {"active_nav": "collections", "collection": None}, db)
+
+
+@router.post("/collections/new")
+def collection_new_submit(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    sort_order: int = Form(0),
+    active: bool = Form(False),
+    image: UploadFile = FastAPIFile(default=None),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(require_admin),
+):
+    name = name.strip()
+    if not name:
+        return render_admin(
+            request, "admin/collection_form.html", {"active_nav": "collections", "collection": None, "error": "Name is required."}, db, status_code=400
+        )
+
+    image_url = None
+    if image is not None and image.filename:
+        try:
+            image_url, _ = save_product_image(image)
+        except UploadValidationError as exc:
+            return render_admin(
+                request, "admin/collection_form.html", {"active_nav": "collections", "collection": None, "error": exc.detail}, db, status_code=400
+            )
+
+    collection = Collection(
+        name=name,
+        slug=unique_slug(db, Collection, name),
+        description=description.strip() or None,
+        sort_order=sort_order,
+        active=active,
+        image=image_url,
+    )
+    db.add(collection)
+    log_activity(db, admin, "collection.created", f"Created collection '{name}'")
+    db.commit()
+    return RedirectResponse(url="/admin/collections", status_code=303)
+
+
+@router.get("/collections/{collection_id}/edit")
+def collection_edit_page(collection_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    collection = db.get(Collection, collection_id)
+    if collection is None:
+        return RedirectResponse(url="/admin/collections", status_code=303)
+    return render_admin(request, "admin/collection_form.html", {"active_nav": "collections", "collection": collection}, db)
+
+
+@router.post("/collections/{collection_id}/edit")
+def collection_edit_submit(
+    collection_id: int,
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    sort_order: int = Form(0),
+    active: bool = Form(False),
+    image: UploadFile = FastAPIFile(default=None),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(require_admin),
+):
+    collection = db.get(Collection, collection_id)
+    if collection is None:
+        return RedirectResponse(url="/admin/collections", status_code=303)
+
+    name = name.strip()
+    if not name:
+        return render_admin(
+            request, "admin/collection_form.html", {"active_nav": "collections", "collection": collection, "error": "Name is required."}, db, status_code=400
+        )
+
+    if image is not None and image.filename:
+        try:
+            new_image_url, _ = save_product_image(image)
+        except UploadValidationError as exc:
+            return render_admin(
+                request, "admin/collection_form.html", {"active_nav": "collections", "collection": collection, "error": exc.detail}, db, status_code=400
+            )
+        if collection.image:
+            delete_product_image(collection.image)
+        collection.image = new_image_url
+
+    if name != collection.name:
+        collection.slug = unique_slug(db, Collection, name, exclude_id=collection.id)
+    collection.name = name
+    collection.description = description.strip() or None
+    collection.sort_order = sort_order
+    collection.active = active
+    log_activity(db, admin, "collection.updated", f"Updated collection '{name}'", "collection", collection.id)
+    db.commit()
+    return RedirectResponse(url="/admin/collections", status_code=303)
+
+
+@router.post("/collections/{collection_id}/delete")
+def collection_delete(collection_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    collection = db.get(Collection, collection_id)
+    if collection is not None:
+        name = collection.name
+        db.delete(collection)
+        log_activity(db, admin, "collection.deleted", f"Deleted collection '{name}'")
+        db.commit()
+    return RedirectResponse(url="/admin/collections", status_code=303)
+
+
 # ---------- Products ----------
 
 @router.get("/products")
@@ -349,6 +478,7 @@ def _product_form_context(db: Session, product=None, error=None) -> dict:
         "active_nav": "products",
         "product": product,
         "categories": db.query(Category).order_by(Category.name).all(),
+        "collections": db.query(Collection).order_by(Collection.sort_order, Collection.name).all(),
         "error": error,
     }
 
@@ -373,6 +503,7 @@ async def product_new_submit(
     bestseller: bool = Form(False),
     new_arrival: bool = Form(False),
     active: bool = Form(True),
+    collection_ids: list[int] = Form(default=[]),
     images: list[UploadFile] = FastAPIFile(default=[]),
     db: Session = Depends(get_db),
     admin: Admin = Depends(require_admin),
@@ -429,6 +560,9 @@ async def product_new_submit(
     if not product.sku:
         product.sku = f"JJG-{product.id:04d}"
 
+    if collection_ids:
+        product.collections = db.query(Collection).filter(Collection.id.in_(collection_ids)).all()
+
     for idx, (url, thumb_url) in enumerate(saved_images):
         db.add(ProductImage(product_id=product.id, image_url=url, thumbnail_url=thumb_url, sort_order=idx))
 
@@ -461,13 +595,14 @@ async def product_edit_submit(
     bestseller: bool = Form(False),
     new_arrival: bool = Form(False),
     active: bool = Form(True),
+    collection_ids: list[int] = Form(default=[]),
     delete_image_ids: list[int] = Form(default=[]),
     images: list[UploadFile] = FastAPIFile(default=[]),
     image_order: str = Form(""),
     db: Session = Depends(get_db),
     admin: Admin = Depends(require_admin),
 ):
-    product = db.query(Product).options(joinedload(Product.images)).filter(Product.id == product_id).first()
+    product = db.query(Product).options(joinedload(Product.images), joinedload(Product.collections)).filter(Product.id == product_id).first()
     if product is None:
         return RedirectResponse(url="/admin/products", status_code=303)
 
@@ -545,6 +680,7 @@ async def product_edit_submit(
     product.bestseller = bestseller
     product.new_arrival = new_arrival
     product.active = active
+    product.collections = db.query(Collection).filter(Collection.id.in_(collection_ids)).all() if collection_ids else []
 
     description_text = f"Updated product '{product.name}'" + (f" ({'; '.join(changes)})" if changes else "")
     log_activity(db, admin, "product.updated", description_text, "product", product.id)
@@ -889,6 +1025,103 @@ def coupon_delete(coupon_id: int, db: Session = Depends(get_db), admin: Admin = 
         db.delete(coupon)
         db.commit()
     return RedirectResponse(url="/admin/coupons", status_code=303)
+
+
+# ---------- Gift Options ----------
+
+def _gift_option_form_context(gift_option=None, error=None) -> dict:
+    return {"active_nav": "gift-options", "gift_option": gift_option, "error": error}
+
+
+@router.get("/gift-options")
+def gift_options_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    gift_options = db.query(GiftOption).order_by(GiftOption.sort_order, GiftOption.name).all()
+    return render_admin(request, "admin/gift_options_list.html", {"active_nav": "gift-options", "gift_options": gift_options}, db)
+
+
+@router.get("/gift-options/new")
+def gift_option_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    return render_admin(request, "admin/gift_option_form.html", _gift_option_form_context(), db)
+
+
+@router.post("/gift-options/new")
+def gift_option_new_submit(
+    request: Request,
+    name: str = Form(...),
+    price: float = Form(...),
+    sort_order: int = Form(0),
+    active: bool = Form(True),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(require_admin),
+):
+    name = name.strip()
+    error = None
+    if not name:
+        error = "Name is required."
+    elif price < 0:
+        error = "Price cannot be negative."
+
+    if error:
+        return render_admin(request, "admin/gift_option_form.html", _gift_option_form_context(error=error), db, status_code=400)
+
+    gift_option = GiftOption(name=name, price=price, sort_order=sort_order, active=active)
+    db.add(gift_option)
+    log_activity(db, admin, "gift_option.created", f"Created gift option '{name}' (₹{price:.0f})")
+    db.commit()
+    return RedirectResponse(url="/admin/gift-options", status_code=303)
+
+
+@router.get("/gift-options/{gift_option_id}/edit")
+def gift_option_edit_page(gift_option_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    gift_option = db.get(GiftOption, gift_option_id)
+    if gift_option is None:
+        return RedirectResponse(url="/admin/gift-options", status_code=303)
+    return render_admin(request, "admin/gift_option_form.html", _gift_option_form_context(gift_option=gift_option), db)
+
+
+@router.post("/gift-options/{gift_option_id}/edit")
+def gift_option_edit_submit(
+    gift_option_id: int,
+    request: Request,
+    name: str = Form(...),
+    price: float = Form(...),
+    sort_order: int = Form(0),
+    active: bool = Form(True),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(require_admin),
+):
+    gift_option = db.get(GiftOption, gift_option_id)
+    if gift_option is None:
+        return RedirectResponse(url="/admin/gift-options", status_code=303)
+
+    name = name.strip()
+    error = None
+    if not name:
+        error = "Name is required."
+    elif price < 0:
+        error = "Price cannot be negative."
+
+    if error:
+        return render_admin(request, "admin/gift_option_form.html", _gift_option_form_context(gift_option=gift_option, error=error), db, status_code=400)
+
+    gift_option.name = name
+    gift_option.price = price
+    gift_option.sort_order = sort_order
+    gift_option.active = active
+    log_activity(db, admin, "gift_option.updated", f"Updated gift option '{name}' (₹{price:.0f})", "gift_option", gift_option.id)
+    db.commit()
+    return RedirectResponse(url="/admin/gift-options", status_code=303)
+
+
+@router.post("/gift-options/{gift_option_id}/delete")
+def gift_option_delete(gift_option_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    gift_option = db.get(GiftOption, gift_option_id)
+    if gift_option is not None:
+        name = gift_option.name
+        db.delete(gift_option)
+        log_activity(db, admin, "gift_option.deleted", f"Deleted gift option '{name}'")
+        db.commit()
+    return RedirectResponse(url="/admin/gift-options", status_code=303)
 
 
 # ---------- Reviews ----------

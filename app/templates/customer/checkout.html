@@ -55,6 +55,17 @@
           <label for="gift_message">Gift Message (optional)</label>
           <textarea class="form-control" id="gift_message" name="gift_message" rows="2" maxlength="300" placeholder="Write a short note for the recipient..."></textarea>
         </div>
+        {% if gift_options %}
+        <div class="form-group">
+          <label>Add Gift Extras</label>
+          {% for opt in gift_options %}
+          <label style="display:flex; align-items:center; gap:8px; font-weight:400; margin-top:4px;">
+            <input type="checkbox" name="gift_option_ids" value="{{ opt.id }}" class="js-gift-option" data-price="{{ opt.price }}">
+            {{ opt.name }} — ₹{{ "%.0f"|format(opt.price) }}
+          </label>
+          {% endfor %}
+        </div>
+        {% endif %}
 
         <h2 style="font-size:1rem;">Coupon Code (optional)</h2>
         <div class="form-group">
@@ -114,9 +125,18 @@
   var baseDeliveryCharge = {{ delivery_charge }};
   var currentDiscount = 0;
 
+  function giftOptionsCharge() {
+    var total = 0;
+    document.querySelectorAll('.js-gift-option:checked').forEach(function (cb) {
+      total += parseFloat(cb.getAttribute('data-price')) || 0;
+    });
+    return total;
+  }
+
   function renderTotals(discountAmount) {
     currentDiscount = discountAmount;
-    var total = Math.max(0, baseSubtotal + baseDeliveryCharge - discountAmount);
+    var giftCharges = giftOptionsCharge();
+    var total = Math.max(0, baseSubtotal + baseDeliveryCharge + giftCharges - discountAmount);
     var discountRow = document.getElementById('summary-discount-row');
     if (discountAmount > 0) {
       discountRow.style.display = '';
@@ -127,6 +147,10 @@
     document.getElementById('summary-total').textContent = '₹' + total.toFixed(0);
     btn.textContent = 'Place Order — ₹' + total.toFixed(0);
   }
+
+  document.querySelectorAll('.js-gift-option').forEach(function (cb) {
+    cb.addEventListener('change', function () { renderTotals(currentDiscount); });
+  });
 
   var applyCouponBtn = document.getElementById('apply-coupon-btn');
   var couponInput = document.getElementById('coupon_code');
@@ -194,6 +218,12 @@
 
     var data = Object.fromEntries(new FormData(form).entries());
     data.idempotency_key = getIdempotencyKey();
+    // Object.fromEntries collapses repeated keys to the last value, which
+    // would silently drop all but one selected gift option — collect the
+    // checked ones explicitly instead.
+    data.gift_option_ids = Array.from(document.querySelectorAll('.js-gift-option:checked')).map(function (cb) {
+      return parseInt(cb.value, 10);
+    });
 
     try {
       var res = await fetch('/api/checkout', {

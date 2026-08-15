@@ -1,0 +1,51 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Gift Options — Admin{% endblock %}
+{% block page_title %}Gift Options{% endblock %}
+
+{% block admin_content %}
+<div class="flex justify-between items-center" style="margin-bottom:14px;">
+  <span class="text-muted">{{ gift_options|length }} gift options</span>
+  <a class="btn btn-primary btn-sm" href="/admin/gift-options/new">+ Add Gift Option</a>
+</div>
+<p class="text-muted" style="font-size:0.85rem; margin-top:-8px;">These appear as optional paid extras (gift wrap, greeting card, etc) at checkout.</p>
+
+{% if gift_options %}
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead><tr><th>Name</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for g in gift_options %}
+      <tr>
+        <td><strong>{{ g.name }}</strong></td>
+        <td>₹{{ "%.0f"|format(g.price) }}</td>
+        <td>{% if g.active %}<span class="badge badge--success">Active</span>{% else %}<span class="badge badge--muted">Inactive</span>{% endif %}</td>
+        <td>
+          <a class="btn btn-sm btn-secondary" href="/admin/gift-options/{{ g.id }}/edit">Edit</a>
+          <form method="post" action="/admin/gift-options/{{ g.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this gift option? Past orders keep their own record of what was charged.');">
+            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div class="admin-card-list">
+  {% for g in gift_options %}
+  <div class="admin-record-card">
+    <div class="admin-record-card__row"><span>Name</span><span><strong>{{ g.name }}</strong></span></div>
+    <div class="admin-record-card__row"><span>Price</span><span>₹{{ "%.0f"|format(g.price) }}</span></div>
+    <div class="admin-record-card__row"><span>Status</span><span>{% if g.active %}<span class="badge badge--success">Active</span>{% else %}<span class="badge badge--muted">Inactive</span>{% endif %}</span></div>
+    <div class="flex gap-8" style="margin-top:10px;">
+      <a class="btn btn-sm btn-secondary" href="/admin/gift-options/{{ g.id }}/edit">Edit</a>
+      <form method="post" action="/admin/gift-options/{{ g.id }}/delete" onsubmit="return confirm('Delete this gift option?');">
+        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state"><h3>No gift options yet.</h3><p>Add one like "Gift Wrap — ₹50" to offer it at checkout.</p></div>
+{% endif %}
+{% endblock %}

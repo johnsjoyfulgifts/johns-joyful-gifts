@@ -19,6 +19,7 @@ class CheckoutRequest(BaseModel):
     payment_method: str = "cod"
     gift_wrap: bool = False
     gift_message: str | None = None
+    gift_option_ids: list[int] = []
     coupon_code: str | None = None
 
     @field_validator("address", "city", "state")

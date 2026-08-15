@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.customer_auth import get_current_customer
 from app.database import get_db
-from app.models import Category, Product, Review
+from app.models import Category, Collection, Product, Review
 from app.product_query import apply_filters, apply_sort, base_active_query, paginate
 from app.settings_service import get_all_settings
 from app.templating import render
@@ -49,6 +49,18 @@ def home(request: Request, db: Session = Depends(get_db)):
     )
     categories = db.query(Category).filter(Category.active.is_(True)).order_by(Category.sort_order, Category.name).all()
 
+    # Only occasions that currently have at least one visible product are
+    # shown — an empty or all-inactive collection just silently disappears
+    # from the homepage rather than linking to a blank page.
+    occasions = (
+        db.query(Collection)
+        .join(Collection.products)
+        .filter(Collection.active.is_(True), Product.active.is_(True), Product.deleted_at.is_(None))
+        .order_by(Collection.sort_order, Collection.name)
+        .distinct()
+        .all()
+    )
+
     has_any_products = base_active_query(db).count() > 0
 
     return render(
@@ -60,6 +72,7 @@ def home(request: Request, db: Session = Depends(get_db)):
             "bestsellers": bestsellers,
             "special_offers": special_offers,
             "categories": categories,
+            "occasions": occasions,
             "has_any_products": has_any_products,
         },
         db,
@@ -171,6 +184,60 @@ def category_page(slug: str, request: Request, page: int = 1, sort: str | None =
     )
 
 
+@router.get("/occasion/{slug}")
+def occasion_page(slug: str, request: Request, page: int = 1, sort: str | None = None, db: Session = Depends(get_db)):
+    collection_obj = db.query(Collection).filter(Collection.slug == slug, Collection.active.is_(True)).first()
+    categories = db.query(Category).filter(Category.active.is_(True)).order_by(Category.sort_order, Category.name).all()
+
+    if collection_obj is None:
+        query = base_active_query(db).filter(Product.id == -1)
+        items, total, total_pages, page = paginate(query, page)
+        return render(
+            request,
+            "customer/shop.html",
+            {
+                "products": items,
+                "total": total,
+                "total_pages": total_pages,
+                "page": page,
+                "categories": categories,
+                "current_category": None,
+                "filters": {"q": "", "category": "", "min_price": None, "max_price": None, "in_stock": False, "sort": ""},
+                "has_active_filters": False,
+                "page_title": "Collection Not Found",
+            },
+            db,
+            status_code=404,
+        )
+
+    query = (
+        base_active_query(db)
+        .options(joinedload(Product.images))
+        .join(Product.collections)
+        .filter(Collection.id == collection_obj.id)
+    )
+    query = apply_sort(query, sort)
+    items, total, total_pages, page = paginate(query, page)
+
+    return render(
+        request,
+        "customer/shop.html",
+        {
+            "products": items,
+            "total": total,
+            "total_pages": total_pages,
+            "page": page,
+            "categories": categories,
+            "current_category": None,
+            "filters": {"q": "", "category": "", "min_price": None, "max_price": None, "in_stock": False, "sort": sort or ""},
+            "has_active_filters": bool(sort),
+            "page_title": collection_obj.name,
+            "page_description": collection_obj.description,
+        },
+        db,
+    )
+
+
 @router.get("/search")
 def search(request: Request, q: str = "", page: int = 1, db: Session = Depends(get_db)):
     q = (q or "").strip()
@@ -196,17 +263,31 @@ def product_detail(slug: str, request: Request, db: Session = Depends(get_db)):
 
     product = (
         db.query(Product)
-        .options(joinedload(Product.images), joinedload(Product.category))
+        .options(joinedload(Product.images), joinedload(Product.category), joinedload(Product.collections))
         .filter(Product.slug == slug)
         .first()
     )
     if product is None or not product.active or product.deleted_at is not None:
         return render(request, "errors/404.html", {}, db, status_code=404)
 
+    # Cast a wider net than "same category alone": same collection (occasion)
+    # or a similar price band both count as related too, then rank so the
+    # closest matches (same category, closest price) surface first — all in
+    # one query rather than several separate lookups merged in Python.
+    collection_ids = [c.id for c in product.collections]
+    price_low, price_high = product.price * 0.5, product.price * 1.5
+    relatedness_conditions = [Product.category_id == product.category_id, Product.price.between(price_low, price_high)]
+    if collection_ids:
+        relatedness_conditions.append(Product.collections.any(Collection.id.in_(collection_ids)))
+
     related = (
         base_active_query(db)
         .options(joinedload(Product.images))
-        .filter(Product.category_id == product.category_id, Product.id != product.id)
+        .filter(Product.id != product.id, or_(*relatedness_conditions))
+        .order_by(
+            (Product.category_id != product.category_id),
+            func.abs(Product.price - product.price),
+        )
         .limit(6)
         .all()
     )
