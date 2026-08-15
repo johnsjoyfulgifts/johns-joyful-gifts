@@ -304,6 +304,7 @@ def product_detail(slug: str, request: Request, db: Session = Depends(get_db)):
             product,
             template=store_values.get("whatsapp_product_template", ""),
             customer_name=current_customer.name if current_customer else "",
+            product_url=str(request.url_for("product_detail", slug=product.slug)),
         ),
     )
 

@@ -18,6 +18,7 @@ DEFAULT_PRODUCT_TEMPLATE = (
     "Hi, I'm interested in this product: [PRODUCT_NAME] (SKU: [SKU]).\n"
     "Price: ₹[PRICE]\n"
     "Quantity: [QUANTITY]\n"
+    "Link: [PRODUCT_LINK]\n"
     "Please share more details."
 )
 
@@ -39,7 +40,9 @@ def render_whatsapp_template(template: str, **values) -> str:
     return result
 
 
-def product_enquiry_message(product: Product, template: str = "", quantity: int = 1, customer_name: str = "") -> str:
+def product_enquiry_message(
+    product: Product, template: str = "", quantity: int = 1, customer_name: str = "", product_url: str = ""
+) -> str:
     return render_whatsapp_template(
         template or DEFAULT_PRODUCT_TEMPLATE,
         PRODUCT_NAME=product.name,
@@ -48,6 +51,7 @@ def product_enquiry_message(product: Product, template: str = "", quantity: int 
         QUANTITY=quantity,
         CART_TOTAL=f"{product.price * quantity:.0f}",
         CUSTOMER_NAME=customer_name,
+        PRODUCT_LINK=product_url,
     )
 
 

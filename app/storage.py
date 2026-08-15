@@ -23,9 +23,19 @@ ALLOWED_CONTENT_TYPES = {
     "image/png": "png",
     "image/webp": "webp",
 }
-CONTENT_TYPE_FOR_EXT = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
 MAX_DIMENSION = 2000  # px, longest side — large phone photos get downscaled
 THUMBNAIL_DIMENSION = 400  # px, longest side — used everywhere but the product detail hero/gallery
+
+# Every upload is re-encoded to WebP regardless of the input format (Pillow
+# already supports it — no new dependency). At equal visual quality WebP
+# runs meaningfully smaller than JPEG/PNG, which is the whole point of an
+# "optimize once, serve many times" pipeline. Existing images already
+# stored as .jpg/.png are untouched — this only affects new uploads.
+OUTPUT_FORMAT = "WEBP"
+OUTPUT_EXT = "webp"
+OUTPUT_CONTENT_TYPE = "image/webp"
+FULL_QUALITY = 88  # "visually-lossless" territory for WebP; within the requested 85-90% band
+THUMBNAIL_QUALITY = 80  # thumbnails are viewed small, so a bit more headroom to save bytes is invisible
 
 
 class UploadValidationError(HTTPException):
@@ -38,13 +48,12 @@ def _client():
     return create_client(settings.supabase_url, settings.supabase_service_key)
 
 
-def _encode(image: Image.Image, save_format: str, quality: int) -> bytes:
-    if save_format == "JPEG" and image.mode != "RGB":
-        image = image.convert("RGB")
-    save_kwargs = {"quality": quality} if save_format == "JPEG" else {}
+def _encode(image: Image.Image, quality: int) -> bytes:
+    # WebP handles RGB and RGBA natively, so — unlike the old JPEG path —
+    # there's no need to flatten transparency first.
     buffer = io.BytesIO()
     try:
-        image.save(buffer, format=save_format, **save_kwargs)
+        image.save(buffer, format=OUTPUT_FORMAT, quality=quality)
     except (OSError, KeyError):
         raise UploadValidationError("We couldn't save this image. Please try a different file.")
     return buffer.getvalue()
@@ -84,16 +93,16 @@ def save_product_image(upload: UploadFile) -> tuple[str, str]:
     if max(image.size) > MAX_DIMENSION:
         image.thumbnail((MAX_DIMENSION, MAX_DIMENSION))
 
-    ext = ALLOWED_CONTENT_TYPES[upload.content_type]
-    save_format = "JPEG" if ext == "jpg" else ext.upper()
-    content_type = CONTENT_TYPE_FOR_EXT[ext]
-
     stem = uuid.uuid4().hex
-    image_url = _upload(f"{stem}.{ext}", _encode(image, save_format, quality=85), content_type)
+    image_url = _upload(
+        f"{stem}.{OUTPUT_EXT}", _encode(image, FULL_QUALITY), OUTPUT_CONTENT_TYPE
+    )
 
     thumb = image.copy()
     thumb.thumbnail((THUMBNAIL_DIMENSION, THUMBNAIL_DIMENSION))
-    thumbnail_url = _upload(f"{stem}-thumb.{ext}", _encode(thumb, save_format, quality=80), content_type)
+    thumbnail_url = _upload(
+        f"{stem}-thumb.{OUTPUT_EXT}", _encode(thumb, THUMBNAIL_QUALITY), OUTPUT_CONTENT_TYPE
+    )
 
     return image_url, thumbnail_url
 
