@@ -58,6 +58,17 @@
   </section>
   {% endif %}
 
+  {% if age_groups %}
+  <section class="page-section">
+    <div class="section-tinted section-tinted--category">
+      <h2 class="section-title">🧒 Shop by Age</h2>
+      <div class="category-card-row">
+        {% for age in age_groups %}{{ catcards.category_card(age, url_prefix='age', default_icon='🎈') }}{% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
   <section class="page-section">
     <div class="section-tinted">
       <h2 class="section-title">💰 Shop by Budget</h2>

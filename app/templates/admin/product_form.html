@@ -38,11 +38,14 @@
     </div>
 
     {% if collections %}
+    {% set assigned_ids = product.collections|map(attribute='id')|list if product else [] %}
+    {% set occasion_collections = collections|selectattr('kind', 'equalto', 'occasion')|list %}
+    {% set age_collections = collections|selectattr('kind', 'equalto', 'age')|list %}
+    {% if occasion_collections %}
     <div class="form-group">
-      <label>Occasions / Collections (optional)</label>
-      {% set assigned_ids = product.collections|map(attribute='id')|list if product else [] %}
+      <label>Occasions (optional)</label>
       <div class="flex gap-8" style="flex-wrap:wrap;">
-        {% for c in collections %}
+        {% for c in occasion_collections %}
         <label style="display:flex; align-items:center; gap:6px; font-weight:400; font-size:0.85rem; border:1px solid var(--color-border); border-radius:6px; padding:5px 10px;">
           <input type="checkbox" name="collection_ids" value="{{ c.id }}" {{ 'checked' if c.id in assigned_ids }}>
           {{ c.name }}
@@ -50,6 +53,20 @@
         {% endfor %}
       </div>
     </div>
+    {% endif %}
+    {% if age_collections %}
+    <div class="form-group">
+      <label>Age Groups (optional)</label>
+      <div class="flex gap-8" style="flex-wrap:wrap;">
+        {% for c in age_collections %}
+        <label style="display:flex; align-items:center; gap:6px; font-weight:400; font-size:0.85rem; border:1px solid var(--color-border); border-radius:6px; padding:5px 10px;">
+          <input type="checkbox" name="collection_ids" value="{{ c.id }}" {{ 'checked' if c.id in assigned_ids }}>
+          {{ c.name }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
     {% endif %}
 
     <div class="form-row form-row--3">

@@ -1,22 +1,23 @@
 {% extends "admin/base_admin.html" %}
-{% block title %}Occasions & Collections — Admin{% endblock %}
-{% block page_title %}Occasions & Collections{% endblock %}
+{% block title %}Occasions & Age Groups — Admin{% endblock %}
+{% block page_title %}Occasions & Age Groups{% endblock %}
 
 {% block admin_content %}
 <div class="flex justify-between items-center" style="margin-bottom:14px;">
   <span class="text-muted">{{ collections|length }} collections</span>
   <a class="btn btn-primary btn-sm" href="/admin/collections/new">+ Add Collection</a>
 </div>
-<p class="text-muted" style="font-size:0.85rem; margin-top:-8px;">Group products for occasions and festivals (Diwali, Birthday, Wedding...). Assign products to a collection from the product edit page. Empty or inactive collections are hidden from customers automatically.</p>
+<p class="text-muted" style="font-size:0.85rem; margin-top:-8px;">Group products for occasions (Diwali, Birthday, Wedding...) or age groups (0–2 Years, Teens...) — pick the type when creating one. Assign products to a collection from the product edit page. Empty or inactive collections are hidden from customers automatically.</p>
 
 {% if collections %}
 <div class="admin-table-wrap">
   <table class="admin-table">
-    <thead><tr><th>Name</th><th>Slug</th><th>Products</th><th>Order</th><th>Status</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Name</th><th>Type</th><th>Slug</th><th>Products</th><th>Order</th><th>Status</th><th>Actions</th></tr></thead>
     <tbody>
       {% for c in collections %}
       <tr>
         <td>{{ c.name }}</td>
+        <td>{% if c.kind == 'age' %}<span class="badge badge--info">Age Group</span>{% else %}<span class="badge badge--info">Occasion</span>{% endif %}</td>
         <td class="text-muted">{{ c.slug }}</td>
         <td>{{ counts.get(c.id, 0) }}</td>
         <td>{{ c.sort_order }}</td>
@@ -36,6 +37,7 @@
   {% for c in collections %}
   <div class="admin-record-card">
     <div class="admin-record-card__row"><span>Name</span><span>{{ c.name }}</span></div>
+    <div class="admin-record-card__row"><span>Type</span><span>{{ 'Age Group' if c.kind == 'age' else 'Occasion' }}</span></div>
     <div class="admin-record-card__row"><span>Products</span><span>{{ counts.get(c.id, 0) }}</span></div>
     <div class="admin-record-card__row"><span>Status</span><span>{% if c.active %}<span class="badge badge--success">Active</span>{% else %}<span class="badge badge--muted">Inactive</span>{% endif %}</span></div>
     <div class="flex gap-8" style="margin-top:10px;">
@@ -48,6 +50,6 @@
   {% endfor %}
 </div>
 {% else %}
-<div class="empty-state"><h3>No collections yet.</h3><p>Add one like "Diwali Specials" to group products for an occasion.</p></div>
+<div class="empty-state"><h3>No collections yet.</h3><p>Add one like "Diwali Specials" (Occasion) or "3-5 Years" (Age Group) to group products.</p></div>
 {% endif %}
 {% endblock %}

@@ -324,10 +324,14 @@ class Coupon(Base):
 
 
 class Collection(Base):
-    """Admin-created occasion/festival groupings (e.g. Diwali, Birthday,
-    Wedding) that products can be tagged into — separate from Category,
-    which is the product's one structural department (Toys, Stationery...).
-    A product can belong to any number of collections."""
+    """Admin-created product groupings that products can be tagged into —
+    separate from Category, which is the product's one structural department
+    (Toys, Stationery...). A product can belong to any number of collections.
+
+    `kind` distinguishes what a collection groups by: "occasion" (Diwali,
+    Birthday, Wedding...) or "age" (0-2 Years, Teens...) — same underlying
+    model, tagging UI, and detail-page rendering for both, just filtered and
+    labeled differently on the customer-facing pages."""
 
     __tablename__ = "collections"
 
@@ -338,6 +342,7 @@ class Collection(Base):
     image: Mapped[str | None] = mapped_column(String(500), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    kind: Mapped[str] = mapped_column(String(20), default="occasion")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     products: Mapped[list["Product"]] = relationship(secondary=product_collections, back_populates="collections")

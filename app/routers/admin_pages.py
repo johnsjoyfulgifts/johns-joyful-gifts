@@ -356,11 +356,13 @@ def collection_new_submit(
     description: str = Form(""),
     sort_order: int = Form(0),
     active: bool = Form(False),
+    kind: str = Form("occasion"),
     image: UploadFile = FastAPIFile(default=None),
     db: Session = Depends(get_db),
     admin: Admin = Depends(require_product_admin),
 ):
     name = name.strip()
+    kind = kind if kind in ("occasion", "age") else "occasion"
     if not name:
         return render_admin(
             request, "admin/collection_form.html", {"active_nav": "collections", "collection": None, "error": "Name is required."}, db, status_code=400
@@ -381,6 +383,7 @@ def collection_new_submit(
         description=description.strip() or None,
         sort_order=sort_order,
         active=active,
+        kind=kind,
         image=image_url,
     )
     db.add(collection)
@@ -405,6 +408,7 @@ def collection_edit_submit(
     description: str = Form(""),
     sort_order: int = Form(0),
     active: bool = Form(False),
+    kind: str = Form("occasion"),
     image: UploadFile = FastAPIFile(default=None),
     db: Session = Depends(get_db),
     admin: Admin = Depends(require_product_admin),
@@ -414,6 +418,7 @@ def collection_edit_submit(
         return RedirectResponse(url="/admin/collections", status_code=303)
 
     name = name.strip()
+    kind = kind if kind in ("occasion", "age") else "occasion"
     if not name:
         return render_admin(
             request, "admin/collection_form.html", {"active_nav": "collections", "collection": collection, "error": "Name is required."}, db, status_code=400
@@ -436,6 +441,7 @@ def collection_edit_submit(
     collection.description = description.strip() or None
     collection.sort_order = sort_order
     collection.active = active
+    collection.kind = kind
     log_activity(db, admin, "collection.updated", f"Updated collection '{name}'", "collection", collection.id)
     db.commit()
     return RedirectResponse(url="/admin/collections", status_code=303)

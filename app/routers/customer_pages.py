@@ -50,17 +50,27 @@ def home(request: Request, db: Session = Depends(get_db)):
     )
     categories = db.query(Category).filter(Category.active.is_(True)).order_by(Category.sort_order, Category.name).all()
 
-    # Only occasions that currently have at least one visible product are
+    # Only collections that currently have at least one visible product are
     # shown — an empty or all-inactive collection just silently disappears
-    # from the homepage rather than linking to a blank page.
-    occasions = (
-        db.query(Collection)
-        .join(Collection.products)
-        .filter(Collection.active.is_(True), Product.active.is_(True), Product.deleted_at.is_(None))
-        .order_by(Collection.sort_order, Collection.name)
-        .distinct()
-        .all()
-    )
+    # from the homepage rather than linking to a blank page. Occasion and
+    # age-group collections share the same underlying table, split by `kind`.
+    def _visible_collections(kind: str):
+        return (
+            db.query(Collection)
+            .join(Collection.products)
+            .filter(
+                Collection.kind == kind,
+                Collection.active.is_(True),
+                Product.active.is_(True),
+                Product.deleted_at.is_(None),
+            )
+            .order_by(Collection.sort_order, Collection.name)
+            .distinct()
+            .all()
+        )
+
+    occasions = _visible_collections("occasion")
+    age_groups = _visible_collections("age")
 
     has_any_products = base_active_query(db).count() > 0
 
@@ -74,6 +84,7 @@ def home(request: Request, db: Session = Depends(get_db)):
             "special_offers": special_offers,
             "categories": categories,
             "occasions": occasions,
+            "age_groups": age_groups,
             "has_any_products": has_any_products,
         },
         db,
@@ -185,9 +196,14 @@ def category_page(slug: str, request: Request, page: int = 1, sort: str | None =
     )
 
 
-@router.get("/occasion/{slug}")
-def occasion_page(slug: str, request: Request, page: int = 1, sort: str | None = None, db: Session = Depends(get_db)):
-    collection_obj = db.query(Collection).filter(Collection.slug == slug, Collection.active.is_(True)).first()
+def _collection_detail_page(
+    slug: str, request: Request, page: int, sort: str | None, db: Session, kind: str, not_found_title: str
+):
+    collection_obj = (
+        db.query(Collection)
+        .filter(Collection.slug == slug, Collection.active.is_(True), Collection.kind == kind)
+        .first()
+    )
     categories = db.query(Category).filter(Category.active.is_(True)).order_by(Category.sort_order, Category.name).all()
 
     if collection_obj is None:
@@ -205,7 +221,7 @@ def occasion_page(slug: str, request: Request, page: int = 1, sort: str | None =
                 "current_category": None,
                 "filters": {"q": "", "category": "", "min_price": None, "max_price": None, "in_stock": False, "sort": ""},
                 "has_active_filters": False,
-                "page_title": "Collection Not Found",
+                "page_title": not_found_title,
             },
             db,
             status_code=404,
@@ -237,6 +253,16 @@ def occasion_page(slug: str, request: Request, page: int = 1, sort: str | None =
         },
         db,
     )
+
+
+@router.get("/occasion/{slug}")
+def occasion_page(slug: str, request: Request, page: int = 1, sort: str | None = None, db: Session = Depends(get_db)):
+    return _collection_detail_page(slug, request, page, sort, db, kind="occasion", not_found_title="Collection Not Found")
+
+
+@router.get("/age/{slug}")
+def age_group_page(slug: str, request: Request, page: int = 1, sort: str | None = None, db: Session = Depends(get_db)):
+    return _collection_detail_page(slug, request, page, sort, db, kind="age", not_found_title="Age Group Not Found")
 
 
 @router.get("/search")
@@ -388,10 +414,14 @@ def sitemap(request: Request, db: Session = Depends(get_db)):
     static_paths = ["/", "/shop", "/about", "/contact", "/privacy-policy", "/terms", "/shipping-policy", "/refund-policy"]
     products = db.query(Product.slug).filter(Product.active.is_(True), Product.deleted_at.is_(None)).all()
     categories = db.query(Category.slug).filter(Category.active.is_(True)).all()
+    occasions = db.query(Collection.slug).filter(Collection.active.is_(True), Collection.kind == "occasion").all()
+    age_groups = db.query(Collection.slug).filter(Collection.active.is_(True), Collection.kind == "age").all()
 
     urls = [f"{base_url}{p}" for p in static_paths]
     urls += [f"{base_url}/product/{slug}" for (slug,) in products]
     urls += [f"{base_url}/category/{slug}" for (slug,) in categories]
+    urls += [f"{base_url}/occasion/{slug}" for (slug,) in occasions]
+    urls += [f"{base_url}/age/{slug}" for (slug,) in age_groups]
 
     body = "".join(f"<url><loc>{u}</loc></url>" for u in urls)
     xml = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{body}</urlset>'
