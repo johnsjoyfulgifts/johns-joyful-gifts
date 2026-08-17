@@ -128,17 +128,25 @@ async def api_checkout(
             message = message[len("Value error, "):]
         return JSONResponse({"detail": message}, status_code=422)
 
-    # Never trust the client's claim that manual payment is configured —
-    # re-check server-side in case the admin turned it off after the page
-    # loaded, and silently fall back to COD rather than failing checkout.
-    if checkout_data.payment_method == "manual" and not manual_payment_available(db):
-        checkout_data.payment_method = "cod"
-
     # Fast-path idempotency check on the ordinary (read-only) session — if a
-    # previous attempt with this key already succeeded, just return it.
+    # previous attempt with this key already succeeded, just return it. This
+    # runs before the payment-availability check below so a retry of an
+    # already-placed order still succeeds even if the admin disabled manual
+    # payment in between.
     existing = db.query(Order).filter(Order.idempotency_key == checkout_data.idempotency_key).first()
     if existing is not None:
         return _order_number_response(existing)
+
+    # UPI / Bank Transfer is the only payment method (Cash on Delivery has
+    # been removed) — never trust the client's claim that it's configured,
+    # re-check server-side in case the admin turned it off after the page
+    # loaded, and refuse the order rather than accepting one with no valid
+    # way to pay.
+    if not manual_payment_available(db):
+        return JSONResponse(
+            {"detail": "Online payment isn't set up right now. Please message us on WhatsApp to place your order."},
+            status_code=400,
+        )
 
     product_ids = [int(pid) for pid in raw_cart.keys()]
 
@@ -217,7 +225,7 @@ async def api_checkout(
             coupon_code=applied_coupon_code,
             discount_amount=discount_amount,
             total=total,
-            payment_method=MANUAL_PAYMENT_METHOD_LABEL if checkout_data.payment_method == "manual" else "Cash on Delivery",
+            payment_method=MANUAL_PAYMENT_METHOD_LABEL,
             payment_status="Pending",
             order_status=OrderStatus.PLACED.value,
             notes=checkout_data.delivery_instructions or None,

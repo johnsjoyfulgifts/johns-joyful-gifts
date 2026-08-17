@@ -3,6 +3,17 @@ from app.cart_service import CART_COOKIE_NAME
 from app.models import Category, Customer, Product
 
 
+def ensure_manual_payment(db):
+    """UPI/Bank Transfer is the only checkout payment method now that Cash on
+    Delivery has been removed, so /api/checkout refuses to place an order
+    unless it's configured. Tests that aren't specifically exercising that
+    configuration state (payment-method tests live in test_manual_payment.py)
+    need this called first so their checkout calls succeed."""
+    from app.settings_service import set_settings
+
+    set_settings(db, {"manual_payment_enabled": "true", "upi_id": "teststore@okhdfcbank"})
+
+
 def make_customer(db, mobile="9000000001", name="Test Customer", password="testpass123"):
     from app.auth import hash_password
 

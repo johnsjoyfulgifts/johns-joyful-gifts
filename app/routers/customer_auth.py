@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 
@@ -133,16 +133,59 @@ def logout():
     return response
 
 
-@router.get("/account")
-def account_page(request: Request, db: Session = Depends(get_db), customer: Customer = Depends(require_customer)):
-    orders = (
+def _customer_orders(db: Session, customer: Customer) -> list[Order]:
+    return (
         db.query(Order)
         .options(joinedload(Order.items))
         .filter(Order.customer_id == customer.id)
         .order_by(Order.created_at.desc())
         .all()
     )
-    return render(request, "customer/account.html", {"customer": customer, "orders": orders}, db)
+
+
+@router.get("/account")
+def account_page(request: Request, db: Session = Depends(get_db), customer: Customer = Depends(require_customer)):
+    return render(request, "customer/account.html", {"customer": customer, "orders": _customer_orders(db, customer)}, db)
+
+
+@router.post("/account/profile-picture")
+def update_profile_picture(
+    request: Request,
+    db: Session = Depends(get_db),
+    customer: Customer = Depends(require_customer),
+    profile_picture: UploadFile = File(...),
+):
+    from app.storage import UploadValidationError, delete_product_image, save_avatar_image
+
+    try:
+        new_url = save_avatar_image(profile_picture)
+    except UploadValidationError as exc:
+        return render(
+            request,
+            "customer/account.html",
+            {"customer": customer, "orders": _customer_orders(db, customer), "profile_picture_error": exc.detail},
+            db,
+            status_code=400,
+        )
+
+    old_url = customer.profile_picture_url
+    customer.profile_picture_url = new_url
+    db.commit()
+    if old_url:
+        delete_product_image(old_url)  # generic bucket-object delete, despite the name
+    return RedirectResponse(url="/account", status_code=303)
+
+
+@router.post("/account/profile-picture/remove")
+def remove_profile_picture(db: Session = Depends(get_db), customer: Customer = Depends(require_customer)):
+    from app.storage import delete_product_image
+
+    old_url = customer.profile_picture_url
+    customer.profile_picture_url = None
+    db.commit()
+    if old_url:
+        delete_product_image(old_url)
+    return RedirectResponse(url="/account", status_code=303)
 
 
 @router.get("/account/change-password")

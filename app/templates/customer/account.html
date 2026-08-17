@@ -4,13 +4,37 @@
 {% block content %}
 <div class="container page-section">
   <div class="flex justify-between items-center" style="margin-bottom:16px; flex-wrap:wrap; gap:10px;">
-    <div>
-      <h1 class="section-title mb-0">My Account</h1>
-      <p class="text-muted" style="margin:2px 0 0;">{{ customer.name }} · {{ customer.mobile }}</p>
+    <div class="flex items-center gap-12">
+      <div class="account-avatar">
+        {% if customer.profile_picture_url %}<img src="{{ customer.profile_picture_url }}" alt="">{% else %}<span>👤</span>{% endif %}
+      </div>
+      <div>
+        <h1 class="section-title mb-0">My Account</h1>
+        <p class="text-muted" style="margin:2px 0 0;">{{ customer.name }} · {{ customer.mobile }}</p>
+      </div>
     </div>
     <div class="flex gap-8">
       <a class="btn btn-outline btn-sm" href="/account/change-password">Change Password</a>
       <a class="btn btn-secondary btn-sm" href="/logout">Log Out</a>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <h2 style="font-size:1rem; margin-top:0;">Profile Picture</h2>
+    {% if profile_picture_error %}<p class="alert alert--error">{{ profile_picture_error }}</p>{% endif %}
+    <div class="flex items-center gap-12" style="flex-wrap:wrap;">
+      <div class="account-avatar account-avatar--lg">
+        {% if customer.profile_picture_url %}<img src="{{ customer.profile_picture_url }}" alt="">{% else %}<span>👤</span>{% endif %}
+      </div>
+      <form method="post" action="/account/profile-picture" enctype="multipart/form-data" class="flex items-center gap-8" style="flex-wrap:wrap;">
+        <input type="file" name="profile_picture" accept="image/jpeg,image/png,image/webp" required>
+        <button type="submit" class="btn btn-sm btn-primary">{{ 'Change Photo' if customer.profile_picture_url else 'Upload Photo' }}</button>
+      </form>
+      {% if customer.profile_picture_url %}
+      <form method="post" action="/account/profile-picture/remove">
+        <button type="submit" class="btn btn-sm btn-outline">Remove</button>
+      </form>
+      {% endif %}
     </div>
   </div>
 

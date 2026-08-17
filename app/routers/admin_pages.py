@@ -1593,9 +1593,8 @@ def order_update_status(
         db.add(OrderStatusHistory(order_id=order.id, status=status))
 
         # Cancelling releases any stock this order was holding — matters
-        # most for abandoned online payments, but applies equally to COD.
-        # Guarded by stock_restored so re-saving/re-cancelling never double-
-        # restores the same units.
+        # most for abandoned online payments. Guarded by stock_restored so
+        # re-saving/re-cancelling never double-restores the same units.
         if status == OrderStatus.CANCELLED.value and not order.stock_restored:
             for item in order.items:
                 if item.product_id is not None:

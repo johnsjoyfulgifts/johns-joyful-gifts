@@ -25,6 +25,7 @@ ALLOWED_CONTENT_TYPES = {
 }
 MAX_DIMENSION = 2000  # px, longest side — large phone photos get downscaled
 THUMBNAIL_DIMENSION = 400  # px, longest side — used everywhere but the product detail hero/gallery
+AVATAR_DIMENSION = 500  # px, longest side — profile pictures are only ever shown small
 
 # Every upload is re-encoded to WebP regardless of the input format (Pillow
 # already supports it — no new dependency). At equal visual quality WebP
@@ -67,10 +68,7 @@ def _upload(filename: str, data: bytes, content_type: str) -> str:
     return _client().storage.from_(BUCKET).get_public_url(filename)
 
 
-def save_product_image(upload: UploadFile) -> tuple[str, str]:
-    """Validates and uploads a product image (plus a smaller thumbnail, used
-    everywhere except the product detail hero/gallery) to Supabase Storage.
-    Returns (image_url, thumbnail_url)."""
+def _validate_and_load_image(upload: UploadFile) -> Image.Image:
     if upload.content_type not in ALLOWED_CONTENT_TYPES:
         raise UploadValidationError("Please upload a JPG, PNG, or WEBP image.")
 
@@ -86,9 +84,16 @@ def save_product_image(upload: UploadFile) -> tuple[str, str]:
         image.verify()
         # Re-open after verify() (which leaves the file unusable for further ops).
         image = Image.open(io.BytesIO(raw))
-        image = image.convert("RGB") if image.mode not in ("RGB", "RGBA") else image
+        return image.convert("RGB") if image.mode not in ("RGB", "RGBA") else image
     except (UnidentifiedImageError, OSError):
         raise UploadValidationError("This file doesn't look like a valid image.")
+
+
+def save_product_image(upload: UploadFile) -> tuple[str, str]:
+    """Validates and uploads a product image (plus a smaller thumbnail, used
+    everywhere except the product detail hero/gallery) to Supabase Storage.
+    Returns (image_url, thumbnail_url)."""
+    image = _validate_and_load_image(upload)
 
     if max(image.size) > MAX_DIMENSION:
         image.thumbnail((MAX_DIMENSION, MAX_DIMENSION))
@@ -105,6 +110,20 @@ def save_product_image(upload: UploadFile) -> tuple[str, str]:
     )
 
     return image_url, thumbnail_url
+
+
+def save_avatar_image(upload: UploadFile) -> str:
+    """Validates and uploads a customer profile picture to Supabase Storage
+    (same bucket as product images, under an avatars/ prefix — one small
+    object per customer, no separate thumbnail needed since it's never shown
+    larger than a small circle anywhere in the UI). Returns the image URL."""
+    image = _validate_and_load_image(upload)
+
+    if max(image.size) > AVATAR_DIMENSION:
+        image.thumbnail((AVATAR_DIMENSION, AVATAR_DIMENSION))
+
+    filename = f"avatars/{uuid.uuid4().hex}.{OUTPUT_EXT}"
+    return _upload(filename, _encode(image, THUMBNAIL_QUALITY), OUTPUT_CONTENT_TYPE)
 
 
 def delete_product_image(image_url: str, thumbnail_url: str | None = None) -> None:

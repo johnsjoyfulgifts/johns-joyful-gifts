@@ -7,10 +7,18 @@ CURRENT server-side product price, even after the price changes between
 adding to cart and checking out, and that snapshots then stay frozen.
 """
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
-from tests.helpers import checkout_cookies, checkout_payload, make_customer, make_product
+from tests.helpers import checkout_cookies, checkout_payload, ensure_manual_payment, make_customer, make_product
+
+
+@pytest.fixture(autouse=True)
+def _manual_payment_configured():
+    db = SessionLocal()
+    ensure_manual_payment(db)
+    db.close()
 
 
 def test_total_is_computed_from_current_server_side_price(fastapi_app):

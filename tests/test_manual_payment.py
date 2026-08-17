@@ -1,9 +1,10 @@
 """
 Free manual payment (UPI / bank transfer): no gateway, no fees, no API keys.
+It's the only checkout payment method (Cash on Delivery has been removed).
 The admin fills in a UPI ID / bank details and manually marks orders Paid
-after checking their own UPI/bank app -- these tests cover that it's off
-by default, only appears once actually configured, and that a client can't
-force it on server-side.
+after checking their own UPI/bank app -- these tests cover that checkout is
+refused until it's actually configured, and that a client can't force it on
+server-side by claiming it's available when it isn't.
 """
 
 from fastapi.testclient import TestClient
@@ -26,15 +27,19 @@ def _login_as_admin(client: TestClient, email: str) -> None:
     assert response.status_code == 303, response.text
 
 
-def test_manual_payment_unavailable_by_default():
+def test_manual_payment_unavailable_when_disabled():
     db = SessionLocal()
+    set_settings(db, {"manual_payment_enabled": "false", "upi_id": "", "bank_account_number": ""})
     assert manual_payment_available(db) is False
     db.close()
 
 
 def test_manual_payment_unavailable_when_enabled_but_not_configured():
     db = SessionLocal()
-    set_settings(db, {"manual_payment_enabled": "true"})  # toggled on, no UPI/bank filled in
+    # Toggled on, but no UPI/bank filled in -- explicitly cleared rather than
+    # relying on a fresh DB, since other tests in the suite also configure
+    # these same settings keys.
+    set_settings(db, {"manual_payment_enabled": "true", "upi_id": "", "bank_account_number": ""})
     assert manual_payment_available(db) is False
     db.close()
 
@@ -46,10 +51,14 @@ def test_manual_payment_available_once_upi_configured():
     db.close()
 
 
-def test_checkout_manual_payment_falls_back_to_cod_when_not_configured(fastapi_app):
+def test_checkout_rejected_when_payment_not_configured(fastapi_app):
+    """Cash on Delivery has been removed, so there's no fallback left --
+    checkout must refuse the order (not silently accept one with no valid
+    way to pay) if the admin hasn't actually configured UPI/bank details,
+    regardless of what the client's payload claims."""
     db = SessionLocal()
-    set_settings(db, {"manual_payment_enabled": "false", "upi_id": ""})
-    product = make_product(db, name="Fallback Payment Product", price=100.0, stock=5)
+    set_settings(db, {"manual_payment_enabled": "false", "upi_id": "", "bank_account_number": ""})
+    product = make_product(db, name="Unavailable Payment Product", price=100.0, stock=5)
     product_id = product.id
     customer = make_customer(db, mobile="9700000101")
     customer_id = customer.id
@@ -58,17 +67,17 @@ def test_checkout_manual_payment_falls_back_to_cod_when_not_configured(fastapi_a
     client = TestClient(fastapi_app)
     response = client.post(
         "/api/checkout",
-        json=checkout_payload("manual-fallback-key", payment_method="manual"),
+        json=checkout_payload("manual-unavailable-key", payment_method="manual"),
         cookies=checkout_cookies({product_id: 1}, customer_id),
     )
-    assert response.status_code == 200
-    order_number = response.json()["order_number"]
+    assert response.status_code == 400
+    assert "payment" in response.json()["detail"].lower()
 
     db = SessionLocal()
     from app.models import Order
 
-    order = db.query(Order).filter(Order.order_number == order_number).first()
-    assert order.payment_method == "Cash on Delivery", "must silently fall back, never trust the client's claim"
+    order = db.query(Order).filter(Order.idempotency_key == "manual-unavailable-key").first()
+    assert order is None, "no order should be created when there's no valid payment method"
     db.close()
 
 
@@ -105,24 +114,39 @@ def test_checkout_manual_payment_succeeds_when_configured(fastapi_app):
     assert qr_response.content[:8] == b"\x89PNG\r\n\x1a\n"  # PNG magic bytes
 
 
-def test_qr_endpoint_404s_for_cod_order(fastapi_app):
+def test_qr_endpoint_404s_for_non_manual_payment_order(fastapi_app):
+    """Defense in depth: 'cod' is no longer a selectable payment method, but
+    a legacy order from before it was removed could still have that value
+    stored -- the QR endpoint must never serve a payment QR for it."""
     db = SessionLocal()
     set_settings(db, {"manual_payment_enabled": "true", "upi_id": "shop@okhdfcbank"})
-    product = make_product(db, name="COD QR Test Product", price=100.0, stock=5)
-    product_id = product.id
     customer = make_customer(db, mobile="9700000103")
-    customer_id = customer.id
+
+    from app.models import Order, OrderStatus
+
+    order = Order(
+        order_number="JJG-TEST-LEGACYCOD01",
+        customer_id=customer.id,
+        delivery_name=customer.name,
+        delivery_mobile=customer.mobile,
+        delivery_address="123 Test Street",
+        delivery_city="Chennai",
+        delivery_state="Tamil Nadu",
+        delivery_pincode="600001",
+        subtotal=100.0,
+        delivery_charge=0.0,
+        total=100.0,
+        payment_method="Cash on Delivery",
+        payment_status="Pending",
+        order_status=OrderStatus.PLACED.value,
+        idempotency_key="legacy-cod-order-key",
+    )
+    db.add(order)
+    db.commit()
+    order_number = order.order_number
     db.close()
 
     client = TestClient(fastapi_app)
-    response = client.post(
-        "/api/checkout",
-        json=checkout_payload("cod-qr-key", payment_method="cod"),
-        cookies=checkout_cookies({product_id: 1}, customer_id),
-    )
-    assert response.status_code == 200
-    order_number = response.json()["order_number"]
-
     qr_response = client.get(f"/order/{order_number}/payment-qr.png")
     assert qr_response.status_code == 404
 

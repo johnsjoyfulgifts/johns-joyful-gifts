@@ -4,10 +4,18 @@ number used at checkout, must never leak whether an order ID merely exists,
 and must never expose another customer's order.
 """
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
-from tests.helpers import checkout_cookies, checkout_payload, make_customer, make_product
+from tests.helpers import checkout_cookies, checkout_payload, ensure_manual_payment, make_customer, make_product
+
+
+@pytest.fixture(autouse=True)
+def _manual_payment_configured():
+    db = SessionLocal()
+    ensure_manual_payment(db)
+    db.close()
 
 
 def _place_test_order(fastapi_app, mobile="9111111111"):

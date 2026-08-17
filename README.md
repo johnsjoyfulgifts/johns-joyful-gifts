@@ -15,9 +15,12 @@ free tier; nothing in this app can generate a bill.
 - The owner logs into `/admin` (linked at the bottom of every page, or go
   directly to `/admin/login`) to add products, upload photos, manage stock,
   and update order status/courier tracking.
-- Payment is **Cash on Delivery only** — no payment gateway, no transaction
-  fees, no third-party account required to receive money. See "Zero-Cost
-  Guarantee" below for why this is deliberate.
+- Payment is **UPI / Bank Transfer only** — the owner fills in a UPI ID or
+  bank details in `/admin/settings`, customers pay directly (with a QR code
+  shown on the order confirmation page), and the owner manually marks the
+  order Paid. No payment gateway, no transaction fees, no third-party account
+  required to receive money. See "Zero-Cost Guarantee" below for why this is
+  deliberate.
 
 ## Zero-Cost Guarantee
 
@@ -31,7 +34,7 @@ Every piece of this app was chosen specifically to avoid any ongoing cost:
 | Image storage | Supabase Storage (free tier, 1GB) | Free |
 | Authentication | Self-hosted password hashing (bcrypt), no third-party auth service | Free |
 | Customer contact | `wa.me` WhatsApp deep links (not the paid WhatsApp Business API) | Free |
-| Payment | Cash on Delivery | Free |
+| Payment | UPI / Bank Transfer, confirmed manually by the owner | Free |
 | Domain | Free hosting subdomain (`*.onrender.com`) — no domain purchase needed | Free |
 
 An earlier version of this app included an optional Razorpay online-payment

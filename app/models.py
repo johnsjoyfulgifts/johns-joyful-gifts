@@ -160,6 +160,7 @@ class Customer(Base):
     city: Mapped[str | None] = mapped_column(String(120), nullable=True)
     state: Mapped[str | None] = mapped_column(String(120), nullable=True)
     pincode: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    profile_picture_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     orders: Mapped[list["Order"]] = relationship(back_populates="customer")
@@ -185,7 +186,7 @@ class Order(Base):
     coupon_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
     discount_amount: Mapped[float] = mapped_column(Float, default=0)
     total: Mapped[float] = mapped_column(Float)
-    payment_method: Mapped[str] = mapped_column(String(40), default="Cash on Delivery")
+    payment_method: Mapped[str] = mapped_column(String(40), default="UPI / Bank Transfer")
     payment_status: Mapped[str] = mapped_column(String(20), default=PaymentStatus.PENDING.value)
     order_status: Mapped[str] = mapped_column(String(30), default=OrderStatus.PLACED.value)
     courier_name: Mapped[str | None] = mapped_column(String(120), nullable=True)

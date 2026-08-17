@@ -246,6 +246,13 @@ main { flex: 1; }
 }
 .trust-item__title { font-weight: 700; font-size: 0.88rem; }
 
+.account-avatar {
+  width: 44px; height: 44px; border-radius: 50%; background: rgba(107, 115, 80, 0.12);
+  display: flex; align-items: center; justify-content: center; font-size: 1.2rem; overflow: hidden; flex-shrink: 0;
+}
+.account-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.account-avatar--lg { width: 84px; height: 84px; font-size: 2rem; }
+
 /* Section chrome */
 .section-link {
   display: inline-flex; align-items: center; gap: 4px; font-size: 0.8rem; font-weight: 700; color: var(--color-primary-dark);

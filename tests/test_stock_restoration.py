@@ -1,15 +1,23 @@
 """
-Cancelling an order (COD or online) must release the stock it reserved,
-exactly once — this matters more now that online payments can be abandoned
-mid-checkout, leaving a Pending order holding stock nobody will ever pay for.
+Cancelling an order must release the stock it reserved, exactly once — this
+matters because online payments can be abandoned mid-checkout, leaving a
+Pending order holding stock nobody will ever pay for.
 """
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.auth import hash_password
 from app.database import SessionLocal
 from app.models import Admin
-from tests.helpers import checkout_cookies, checkout_payload, make_customer, make_product
+from tests.helpers import checkout_cookies, checkout_payload, ensure_manual_payment, make_customer, make_product
+
+
+@pytest.fixture(autouse=True)
+def _manual_payment_configured():
+    db = SessionLocal()
+    ensure_manual_payment(db)
+    db.close()
 
 
 def _login_as_admin(client: TestClient, email: str) -> None:

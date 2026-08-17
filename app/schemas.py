@@ -27,7 +27,7 @@ class CheckoutRequest(BaseModel):
     pincode: str
     delivery_instructions: str | None = None
     idempotency_key: str
-    payment_method: str = "cod"
+    payment_method: str = "manual"
     gift_wrap: bool = False
     gift_message: str | None = None
     gift_option_ids: list[int] = []
@@ -61,7 +61,7 @@ class CheckoutRequest(BaseModel):
     @field_validator("payment_method")
     @classmethod
     def valid_payment_method(cls, value: str) -> str:
-        if value not in ("cod", "manual"):
+        if value != "manual":
             raise ValueError("Invalid payment method.")
         return value
 

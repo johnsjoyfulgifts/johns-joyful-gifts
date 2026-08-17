@@ -6,10 +6,18 @@ submit button, but the real guarantee has to be server-side.
 
 import threading
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
-from tests.helpers import checkout_cookies, checkout_payload, make_customer, make_product
+from tests.helpers import checkout_cookies, checkout_payload, ensure_manual_payment, make_customer, make_product
+
+
+@pytest.fixture(autouse=True)
+def _manual_payment_configured():
+    db = SessionLocal()
+    ensure_manual_payment(db)
+    db.close()
 
 
 def test_sequential_retry_with_same_idempotency_key_returns_same_order(fastapi_app):

@@ -4,10 +4,18 @@ checkout. Covers registration, login, and that checkout is genuinely gated
 behind an active session rather than just hidden in the UI.
 """
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
-from tests.helpers import checkout_cookies, checkout_payload, make_customer, make_product
+from tests.helpers import checkout_cookies, checkout_payload, ensure_manual_payment, make_customer, make_product
+
+
+@pytest.fixture(autouse=True)
+def _manual_payment_configured():
+    db = SessionLocal()
+    ensure_manual_payment(db)
+    db.close()
 
 
 def test_register_creates_account_and_logs_in(fastapi_app):

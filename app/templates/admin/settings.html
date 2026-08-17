@@ -65,9 +65,9 @@
     <div class="form-group">
       <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
         <input type="checkbox" name="manual_payment_enabled" value="true" {{ 'checked' if values.manual_payment_enabled == 'true' }}>
-        Offer "UPI / Bank Transfer" at checkout, alongside Cash on Delivery
+        Offer "UPI / Bank Transfer" at checkout
       </label>
-      <p class="field-hint">Only appears at checkout once you've filled in a UPI ID or bank details below.</p>
+      <p class="field-hint">This is the only payment method (Cash on Delivery has been removed) — checkout is blocked until you turn this on and fill in a UPI ID or bank details below.</p>
     </div>
     <div class="form-group">
       <label for="upi_id">Your UPI ID</label>
