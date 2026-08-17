@@ -4,6 +4,28 @@
 
 {% block content %}
 <div class="container">
+  <section class="banner-carousel" data-carousel aria-roledescription="carousel" aria-label="Promotions">
+    <div class="banner-carousel__viewport">
+      <div class="banner-carousel__track" data-carousel-track>
+        <div class="banner-carousel__slide" data-carousel-slide>
+          <img
+            src="/static/images/banners/banner-stationery-collection.webp"
+            alt="Small Gifts, Big Smiles! A handpicked collection of premium stationery and desk essentials — cute, useful and meaningful, perfect for students, parents and gift givers."
+            width="1536" height="1024" loading="eager" fetchpriority="high" draggable="false">
+        </div>
+        <div class="banner-carousel__slide" data-carousel-slide>
+          <img
+            src="/static/images/banners/banner-brand-intro.webp"
+            alt="John's Joyful Gifts — Stationery &amp; Return Gifts. Quality products, unique and useful gift items, affordable prices, made with love."
+            width="1536" height="1024" loading="eager" draggable="false">
+        </div>
+      </div>
+      <button type="button" class="banner-carousel__nav banner-carousel__nav--prev" data-carousel-prev aria-label="Previous banner">‹</button>
+      <button type="button" class="banner-carousel__nav banner-carousel__nav--next" data-carousel-next aria-label="Next banner">›</button>
+    </div>
+    <div class="banner-carousel__dots" data-carousel-dots role="tablist" aria-label="Banner navigation"></div>
+  </section>
+
   <section class="hero">
     <h1>{{ store.store_tagline }}</h1>
     <p>Toys, stationery, school bags &amp; gifts — hand-picked with care, delivered with love.</p>
@@ -113,4 +135,127 @@
     </div>
   </section>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var root = document.querySelector('[data-carousel]');
+  if (!root) return;
+  var track = root.querySelector('[data-carousel-track]');
+  var slides = Array.prototype.slice.call(root.querySelectorAll('[data-carousel-slide]'));
+  if (slides.length < 2) return; // nothing to rotate
+
+  var dotsWrap = root.querySelector('[data-carousel-dots]');
+  var prevBtn = root.querySelector('[data-carousel-prev]');
+  var nextBtn = root.querySelector('[data-carousel-next]');
+  var slideWidthPct = 100 / slides.length;
+  track.style.width = (slides.length * 100) + '%';
+  slides.forEach(function (slide) { slide.style.width = slideWidthPct + '%'; });
+
+  var index = 0;
+  var autoplayTimer = null;
+  var resumeTimer = null;
+  var AUTOPLAY_MS = 4500;
+  var RESUME_DELAY_MS = 3500;
+
+  var dots = slides.map(function (_, i) {
+    var dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = 'banner-carousel__dot';
+    dot.setAttribute('role', 'tab');
+    dot.setAttribute('aria-label', 'Go to slide ' + (i + 1));
+    dot.addEventListener('click', function () {
+      goTo(i);
+      pauseThenResume();
+    });
+    dotsWrap.appendChild(dot);
+    return dot;
+  });
+
+  function render() {
+    track.style.transform = 'translateX(-' + (index * slideWidthPct) + '%)';
+    dots.forEach(function (dot, i) {
+      var active = i === index;
+      dot.classList.toggle('active', active);
+      dot.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+  }
+
+  function goTo(i) {
+    index = (i + slides.length) % slides.length;
+    render();
+  }
+
+  function next() { goTo(index + 1); }
+  function prev() { goTo(index - 1); }
+
+  function startAutoplay() {
+    stopAutoplay();
+    autoplayTimer = window.setInterval(next, AUTOPLAY_MS);
+  }
+  function stopAutoplay() {
+    if (autoplayTimer) { window.clearInterval(autoplayTimer); autoplayTimer = null; }
+  }
+  function pauseThenResume() {
+    stopAutoplay();
+    if (resumeTimer) window.clearTimeout(resumeTimer);
+    resumeTimer = window.setTimeout(startAutoplay, RESUME_DELAY_MS);
+  }
+
+  prevBtn.addEventListener('click', function () { prev(); pauseThenResume(); });
+  nextBtn.addEventListener('click', function () { next(); pauseThenResume(); });
+  root.addEventListener('mouseenter', stopAutoplay);
+  root.addEventListener('mouseleave', startAutoplay);
+  root.addEventListener('focusin', stopAutoplay);
+  root.addEventListener('focusout', startAutoplay);
+  root.addEventListener('keydown', function (event) {
+    if (event.key === 'ArrowLeft') { prev(); pauseThenResume(); }
+    else if (event.key === 'ArrowRight') { next(); pauseThenResume(); }
+  });
+
+  // Drag / swipe, via Pointer Events (covers touch + mouse in one API).
+  var viewport = root.querySelector('.banner-carousel__viewport');
+  var dragStartX = null;
+  var dragDeltaX = 0;
+  var dragging = false;
+  var viewportWidth = 1;
+
+  viewport.addEventListener('pointerdown', function (event) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    dragging = true;
+    dragStartX = event.clientX;
+    dragDeltaX = 0;
+    viewportWidth = viewport.getBoundingClientRect().width || 1;
+    track.classList.add('is-dragging');
+    stopAutoplay();
+    try { viewport.setPointerCapture(event.pointerId); } catch (err) { /* ignore */ }
+  });
+
+  viewport.addEventListener('pointermove', function (event) {
+    if (!dragging) return;
+    dragDeltaX = event.clientX - dragStartX;
+    var basePct = index * slideWidthPct;
+    var dragPct = (dragDeltaX / viewportWidth) * slideWidthPct;
+    track.style.transform = 'translateX(-' + (basePct - dragPct) + '%)';
+  });
+
+  function endDrag() {
+    if (!dragging) return;
+    dragging = false;
+    track.classList.remove('is-dragging');
+    var threshold = viewportWidth * 0.15;
+    if (dragDeltaX > threshold) prev();
+    else if (dragDeltaX < -threshold) next();
+    else render(); // snap back to the current slide
+    pauseThenResume();
+  }
+
+  viewport.addEventListener('pointerup', endDrag);
+  viewport.addEventListener('pointercancel', endDrag);
+
+  render();
+  startAutoplay();
+})();
+</script>
 {% endblock %}

@@ -2,12 +2,14 @@
 // network-first for page navigations (stock/prices/cart change constantly,
 // so we never want to silently serve a stale page) with an offline fallback.
 // Bump CACHE_NAME on any future change here to invalidate old caches.
-const CACHE_NAME = "jjg-static-v1";
+const CACHE_NAME = "jjg-static-v2";
 const PRECACHE_URLS = [
   "/static/css/style.css",
   "/static/js/cart.js",
   "/static/icons/favicon.png",
   "/static/icons/logo-icon.png",
+  "/static/images/banners/banner-stationery-collection.webp",
+  "/static/images/banners/banner-brand-intro.webp",
   "/static/manifest.json",
   "/static/offline.html",
 ];
