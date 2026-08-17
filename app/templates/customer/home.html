@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% import "customer/_product_card.html" as cards with context %}
+{% import "customer/_category_card.html" as catcards %}
 {% import "_whatsapp_icon.html" as wa %}
 
 {% block content %}
@@ -37,17 +38,10 @@
 
   {% if categories %}
   <section class="page-section">
-    <div class="section-tinted">
+    <div class="section-tinted section-tinted--category">
       <h2 class="section-title">🗂️ Shop by Category</h2>
-      <div class="category-scroll">
-        {% for cat in categories %}
-        <a class="category-chip" href="/category/{{ cat.slug }}">
-          <span class="category-chip__img">
-            {% if cat.image %}<img src="{{ cat.image }}" alt="">{% else %}🎁{% endif %}
-          </span>
-          {{ cat.name }}
-        </a>
-        {% endfor %}
+      <div class="category-card-row">
+        {% for cat in categories %}{{ catcards.category_card(cat) }}{% endfor %}
       </div>
     </div>
   </section>

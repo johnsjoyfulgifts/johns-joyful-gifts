@@ -1,0 +1,24 @@
+{% macro category_card(cat) %}
+<a class="category-card" href="/category/{{ cat.slug }}">
+  <div class="category-card__media">
+    {% if cat.image %}
+      <img src="{{ cat.image }}" alt="{{ cat.name }}" loading="lazy">
+    {% else %}
+      {% set slug = cat.slug %}
+      <div class="category-card__fallback">
+        {%- if 'pouch' in slug or 'purse' in slug or 'clutch' in slug -%}👝
+        {%- elif 'school' in slug or 'bag' in slug -%}🎒
+        {%- elif 'kid' in slug or 'toy' in slug -%}🧸
+        {%- elif 'stationery' in slug or 'pen' in slug or 'pencil' in slug or 'note' in slug -%}✏️
+        {%- elif 'return' in slug or 'wrap' in slug -%}📦
+        {%- elif 'art' in slug or 'craft' in slug -%}🎨
+        {%- elif 'hair' in slug or 'scrunch' in slug or 'bow' in slug -%}🎀
+        {%- elif 'import' in slug or 'premium' in slug -%}🌟
+        {%- else -%}🎁
+        {%- endif -%}
+      </div>
+    {% endif %}
+  </div>
+  <span class="category-card__name">{{ cat.name }}</span>
+</a>
+{% endmacro %}
