@@ -9,6 +9,22 @@
       <h2 style="font-size:1rem; margin-top:0;">Items</h2>
       {% for item in order.items %}
       <div class="cart-summary-row"><span>{{ item.product_name_snapshot }} × {{ item.quantity }}</span><span>₹{{ "%.0f"|format(item.subtotal) }}</span></div>
+      {% if item.has_personalization %}
+      <div class="alert alert--info" style="margin:-2px 0 10px; font-size:0.85rem;">
+        <strong>🎁 Personalize before packing:</strong>
+        {% if item.personalization_name %}<div><strong>Name:</strong> {{ item.personalization_name }}</div>{% endif %}
+        {% if item.personalization_message %}<div><strong>Message:</strong> "{{ item.personalization_message }}"</div>{% endif %}
+        {% if item.personalization_date %}<div><strong>Date:</strong> {{ item.personalization_date }}</div>{% endif %}
+        {% if item.personalization_photo_url %}
+        <div style="margin-top:6px;">
+          <strong>Photo:</strong><br>
+          <a href="{{ item.personalization_photo_url }}" target="_blank" rel="noopener">
+            <img src="{{ item.personalization_photo_url }}" alt="" style="width:90px;height:90px;object-fit:cover;border-radius:8px;margin-top:4px;">
+          </a>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
       {% endfor %}
       <div class="cart-summary-row"><span>Subtotal</span><span>₹{{ "%.0f"|format(order.subtotal) }}</span></div>
       <div class="cart-summary-row"><span>Delivery</span><span>{{ '₹%.0f'|format(order.delivery_charge) if order.delivery_charge else 'FREE' }}</span></div>

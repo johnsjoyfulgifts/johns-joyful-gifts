@@ -1,5 +1,5 @@
-{% macro category_card(cat) %}
-<a class="category-card" href="/category/{{ cat.slug }}">
+{% macro category_card(cat, url_prefix='category', default_icon='🎁') %}
+<a class="category-card" href="/{{ url_prefix }}/{{ cat.slug }}">
   <div class="category-card__media">
     {% if cat.image %}
       <img src="{{ cat.image }}" alt="{{ cat.name }}" loading="lazy">
@@ -14,7 +14,17 @@
         {%- elif 'art' in slug or 'craft' in slug -%}🎨
         {%- elif 'hair' in slug or 'scrunch' in slug or 'bow' in slug -%}🎀
         {%- elif 'import' in slug or 'premium' in slug -%}🌟
-        {%- else -%}🎁
+        {%- elif 'birthday' in slug -%}🎂
+        {%- elif 'christmas' in slug or 'xmas' in slug -%}🎄
+        {%- elif 'wedding' in slug -%}💍
+        {%- elif 'anniversary' in slug -%}💑
+        {%- elif 'baby' in slug or 'shower' in slug -%}🍼
+        {%- elif 'baptism' in slug or 'christen' in slug -%}✝️
+        {%- elif 'valentine' in slug -%}💝
+        {%- elif 'diwali' in slug -%}🪔
+        {%- elif 'thank' in slug -%}🙏
+        {%- elif 'christian' in slug or 'church' in slug -%}✝️
+        {%- else -%}{{ default_icon }}
         {%- endif -%}
       </div>
     {% endif %}

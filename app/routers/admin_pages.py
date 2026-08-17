@@ -533,6 +533,10 @@ async def product_new_submit(
     bestseller: bool = Form(False),
     new_arrival: bool = Form(False),
     active: bool = Form(True),
+    personalize_name: bool = Form(False),
+    personalize_message: bool = Form(False),
+    personalize_date: bool = Form(False),
+    personalize_photo: bool = Form(False),
     collection_ids: list[int] = Form(default=[]),
     images: list[UploadFile] = FastAPIFile(default=[]),
     db: Session = Depends(get_db),
@@ -581,6 +585,10 @@ async def product_new_submit(
         bestseller=bestseller,
         new_arrival=new_arrival,
         active=active,
+        personalize_name=personalize_name,
+        personalize_message=personalize_message,
+        personalize_date=personalize_date,
+        personalize_photo=personalize_photo,
     )
     db.add(product)
     db.flush()
@@ -625,6 +633,10 @@ async def product_edit_submit(
     bestseller: bool = Form(False),
     new_arrival: bool = Form(False),
     active: bool = Form(True),
+    personalize_name: bool = Form(False),
+    personalize_message: bool = Form(False),
+    personalize_date: bool = Form(False),
+    personalize_photo: bool = Form(False),
     collection_ids: list[int] = Form(default=[]),
     delete_image_ids: list[int] = Form(default=[]),
     images: list[UploadFile] = FastAPIFile(default=[]),
@@ -710,6 +722,10 @@ async def product_edit_submit(
     product.bestseller = bestseller
     product.new_arrival = new_arrival
     product.active = active
+    product.personalize_name = personalize_name
+    product.personalize_message = personalize_message
+    product.personalize_date = personalize_date
+    product.personalize_photo = personalize_photo
     product.collections = db.query(Collection).filter(Collection.id.in_(collection_ids)).all() if collection_ids else []
 
     description_text = f"Updated product '{product.name}'" + (f" ({'; '.join(changes)})" if changes else "")

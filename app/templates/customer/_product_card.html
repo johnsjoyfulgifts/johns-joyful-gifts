@@ -13,6 +13,7 @@
       {% if product.bestseller %}<span class="product-card__badge">🏆 Bestseller</span>{% endif %}
       {% if product.new_arrival %}<span class="product-card__badge">✨ New</span>{% endif %}
       {% if product.featured %}<span class="product-card__badge">🌟 Featured</span>{% endif %}
+      {% if product.is_personalizable %}<span class="product-card__badge product-card__badge--personalize">🎁 Personalize</span>{% endif %}
     </div>
     <button type="button" class="wishlist-heart js-wishlist-toggle" data-product-id="{{ product.id }}" aria-label="Save to wishlist" aria-pressed="false">🤍</button>
   </div>

@@ -158,6 +158,37 @@
   document.addEventListener("DOMContentLoaded", initWishlistHearts);
   if (document.readyState !== "loading") initWishlistHearts();
 
+  // ---- Mobile nav drawer ----
+  (function () {
+    var openBtn = document.getElementById("mobile-menu-open");
+    var closeBtn = document.getElementById("mobile-menu-close");
+    var drawer = document.getElementById("mobile-drawer");
+    var overlay = document.getElementById("mobile-drawer-overlay");
+    if (!openBtn || !drawer || !overlay) return;
+
+    function openDrawer() {
+      drawer.classList.add("is-open");
+      overlay.classList.add("is-open");
+      drawer.setAttribute("aria-hidden", "false");
+      openBtn.setAttribute("aria-expanded", "true");
+      document.body.style.overflow = "hidden";
+    }
+    function closeDrawer() {
+      drawer.classList.remove("is-open");
+      overlay.classList.remove("is-open");
+      drawer.setAttribute("aria-hidden", "true");
+      openBtn.setAttribute("aria-expanded", "false");
+      document.body.style.overflow = "";
+    }
+
+    openBtn.addEventListener("click", openDrawer);
+    if (closeBtn) closeBtn.addEventListener("click", closeDrawer);
+    overlay.addEventListener("click", closeDrawer);
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") closeDrawer();
+    });
+  })();
+
   // Quantity steppers used on product detail + cart lines.
   document.addEventListener("click", function (event) {
     var target = event.target.closest("[data-qty-step]");

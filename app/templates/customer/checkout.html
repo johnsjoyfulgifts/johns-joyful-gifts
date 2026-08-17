@@ -95,6 +95,11 @@
       <h2 style="font-size:1rem; margin-top:0;">Order Summary</h2>
       {% for line in lines %}
       <div class="cart-summary-row"><span>{{ line.product.name }} × {{ line.quantity }}</span><span>₹{{ "%.0f"|format(line.subtotal) }}</span></div>
+      {% if line.personalization %}
+      <p class="field-hint" style="margin:-4px 0 6px;">
+        🎁 Personalized{% if line.personalization.name %} — {{ line.personalization.name }}{% endif %}{% if line.personalization.date %} · {{ line.personalization.date }}{% endif %}
+      </p>
+      {% endif %}
       {% endfor %}
       <div class="cart-summary-row"><span>Subtotal</span><span id="summary-subtotal">₹{{ "%.0f"|format(subtotal) }}</span></div>
       <div class="cart-summary-row"><span>Delivery</span><span>{{ '₹%.0f'|format(delivery_charge) if delivery_charge else 'FREE' }}</span></div>

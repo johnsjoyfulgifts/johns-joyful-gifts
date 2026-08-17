@@ -57,6 +57,7 @@
 
   <header class="site-header">
     <div class="site-header__bar">
+      <button type="button" class="mobile-menu-toggle" id="mobile-menu-open" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-drawer">☰</button>
       <a class="brand" href="/" aria-label="{{ store.store_name }} home">
         <img class="brand__logo" src="/static/icons/logo-icon.png" alt="" width="34" height="34">
         <span>{{ store.store_name }}</span>
@@ -96,11 +97,48 @@
     </nav>
   </header>
 
+  <div class="mobile-drawer-overlay" id="mobile-drawer-overlay"></div>
+  <nav class="mobile-drawer" id="mobile-drawer" aria-label="Menu" aria-hidden="true">
+    <div class="mobile-drawer__head">
+      <span class="brand" style="font-size:1.05rem;">{{ store.store_name }}</span>
+      <button type="button" class="mobile-drawer__close" id="mobile-menu-close" aria-label="Close menu">×</button>
+    </div>
+    <ul class="mobile-drawer__list">
+      <li><a href="/">🏠 Home</a></li>
+      <li><a href="/shop">🛍️ Shop All</a></li>
+      <li><a href="/wishlist">❤️ Wishlist</a></li>
+      <li><a href="/cart">🛒 Cart</a></li>
+      <li><a href="{{ '/account' if current_customer else '/login' }}">👤 {{ 'My Account' if current_customer else 'Log In' }}</a></li>
+      <li><a href="/track-order">📦 Track Order</a></li>
+    </ul>
+    {% if nav_categories %}
+    <div class="mobile-drawer__section">Categories</div>
+    <ul class="mobile-drawer__list">
+      {% for cat in nav_categories %}
+      <li><a href="/category/{{ cat.slug }}">{{ cat.name }}</a></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <div class="mobile-drawer__section">Get in Touch</div>
+    <ul class="mobile-drawer__list">
+      <li><a href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener">{{ wa.whatsapp_icon(16) }} WhatsApp Us</a></li>
+      <li><a href="/contact">✉️ Contact</a></li>
+    </ul>
+  </nav>
+
   <main id="main-content">
     {% block content %}{% endblock %}
   </main>
 
   <a class="whatsapp-float" href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener" aria-label="Chat with us on WhatsApp">{{ wa.whatsapp_icon(22) }}<span class="whatsapp-float__label">WhatsApp</span></a>
+
+  <nav class="bottom-nav" aria-label="Primary">
+    <a href="/" class="bottom-nav__item {{ 'active' if request.url.path == '/' }}"><span class="bottom-nav__icon">🏠</span>Home</a>
+    <a href="/shop" class="bottom-nav__item {{ 'active' if request.url.path == '/shop' }}"><span class="bottom-nav__icon">🛍️</span>Shop</a>
+    <a href="/wishlist" class="bottom-nav__item {{ 'active' if request.url.path == '/wishlist' }}"><span class="bottom-nav__icon">❤️</span>Wishlist</a>
+    <a href="/cart" class="bottom-nav__item {{ 'active' if request.url.path == '/cart' }}"><span class="bottom-nav__icon">🛒{% if cart_count %}<span class="cart-badge" style="top:-6px;right:-10px;">{{ cart_count }}</span>{% endif %}</span>Cart</a>
+    <a href="{{ '/account' if current_customer else '/login' }}" class="bottom-nav__item {{ 'active' if request.url.path in ('/account', '/login') }}"><span class="bottom-nav__icon">👤</span>{{ 'Account' if current_customer else 'Log In' }}</a>
+  </nav>
 
   <footer class="site-footer">
     <div class="container">

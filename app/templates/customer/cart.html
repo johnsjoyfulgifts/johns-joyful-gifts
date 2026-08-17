@@ -17,6 +17,16 @@
         <div class="cart-line__info">
           <div class="cart-line__name">{{ line.product.name }}</div>
           <div class="text-muted" style="font-size:0.85rem;">₹{{ "%.0f"|format(line.product.price) }} each</div>
+          {% if line.personalization %}
+          <div class="personalize-preview" style="margin:6px 0;">
+            <p class="personalize-preview__label">🎁 Personalized</p>
+            {% if line.personalization.name %}<div><strong>Name:</strong> {{ line.personalization.name }}</div>{% endif %}
+            {% if line.personalization.message %}<div><strong>Message:</strong> "{{ line.personalization.message }}"</div>{% endif %}
+            {% if line.personalization.date %}<div><strong>Date:</strong> {{ line.personalization.date }}</div>{% endif %}
+            {% if line.personalization.photo %}<div style="margin-top:4px;"><img src="{{ line.personalization.photo }}" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:6px;"></div>{% endif %}
+            <p class="field-hint" style="margin-bottom:0;">Quantity fixed at 1 for personalized items.</p>
+          </div>
+          {% else %}
           <form class="js-cart-form" action="/api/cart/update" method="post" data-reload-on-success="true" style="margin-top:6px;">
             <input type="hidden" name="product_id" value="{{ line.product.id }}">
             <div class="qty-stepper">
@@ -25,6 +35,7 @@
               <button type="button" data-qty-step="1" aria-label="Increase quantity">+</button>
             </div>
           </form>
+          {% endif %}
         </div>
         <div style="text-align:right;">
           <div style="font-weight:800;">₹{{ "%.0f"|format(line.subtotal) }}</div>

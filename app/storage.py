@@ -26,6 +26,7 @@ ALLOWED_CONTENT_TYPES = {
 MAX_DIMENSION = 2000  # px, longest side — large phone photos get downscaled
 THUMBNAIL_DIMENSION = 400  # px, longest side — used everywhere but the product detail hero/gallery
 AVATAR_DIMENSION = 500  # px, longest side — profile pictures are only ever shown small
+PERSONALIZATION_DIMENSION = 1200  # px, longest side — may end up printed on the product, so kept larger than an avatar
 
 # Every upload is re-encoded to WebP regardless of the input format (Pillow
 # already supports it — no new dependency). At equal visual quality WebP
@@ -124,6 +125,19 @@ def save_avatar_image(upload: UploadFile) -> str:
 
     filename = f"avatars/{uuid.uuid4().hex}.{OUTPUT_EXT}"
     return _upload(filename, _encode(image, THUMBNAIL_QUALITY), OUTPUT_CONTENT_TYPE)
+
+
+def save_personalization_photo(upload: UploadFile) -> str:
+    """Validates and uploads a customer-supplied personalization photo (e.g.
+    a face photo for a custom mug/frame) to Supabase Storage. Same bucket,
+    under a personalization/ prefix. Returns the image URL."""
+    image = _validate_and_load_image(upload)
+
+    if max(image.size) > PERSONALIZATION_DIMENSION:
+        image.thumbnail((PERSONALIZATION_DIMENSION, PERSONALIZATION_DIMENSION))
+
+    filename = f"personalization/{uuid.uuid4().hex}.{OUTPUT_EXT}"
+    return _upload(filename, _encode(image, FULL_QUALITY), OUTPUT_CONTENT_TYPE)
 
 
 def delete_product_image(image_url: str, thumbnail_url: str | None = None) -> None:

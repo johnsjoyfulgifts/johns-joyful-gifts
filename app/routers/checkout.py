@@ -170,8 +170,10 @@ async def api_checkout(
 
         order_items_data = []
         problems = []
-        for pid_str, qty in raw_cart.items():
+        for pid_str, entry in raw_cart.items():
             pid = int(pid_str)
+            qty = entry.get("qty", 0)
+            personalization = entry.get("p") or {}
             product = products_by_id.get(pid)
             if product is None or not product.active or product.deleted_at is not None:
                 problems.append("One of the items in your cart is no longer available.")
@@ -182,12 +184,12 @@ async def api_checkout(
                 else:
                     problems.append(f"Only {product.stock} of '{product.name}' left in stock.")
                 continue
-            order_items_data.append((product, qty))
+            order_items_data.append((product, qty, personalization))
 
         if problems or not order_items_data:
             raise _StockProblem(" ".join(problems) or "Your cart is empty.")
 
-        subtotal = round(sum(product.price * qty for product, qty in order_items_data), 2)
+        subtotal = round(sum(product.price * qty for product, qty, _ in order_items_data), 2)
         delivery_charge = compute_delivery_charge(db, subtotal)
 
         discount_amount = 0.0
@@ -240,7 +242,7 @@ async def api_checkout(
         for opt in selected_gift_options:
             db.add(OrderGiftOption(order_id=order.id, name_snapshot=opt.name, price_snapshot=opt.price))
 
-        for product, qty in order_items_data:
+        for product, qty, personalization in order_items_data:
             db.add(
                 OrderItem(
                     order_id=order.id,
@@ -249,6 +251,10 @@ async def api_checkout(
                     price_snapshot=product.price,
                     quantity=qty,
                     subtotal=round(product.price * qty, 2),
+                    personalization_name=personalization.get("name"),
+                    personalization_message=personalization.get("message"),
+                    personalization_date=personalization.get("date"),
+                    personalization_photo_url=personalization.get("photo"),
                 )
             )
             product.stock -= qty

@@ -77,6 +77,17 @@
       </label>
     </div>
 
+    <div class="form-group">
+      <label>Personalize This Gift</label>
+      <p class="field-hint" style="margin-top:-2px;">Enable whichever fields apply — the product page will only show these, and the customer must fill them in before adding it to cart.</p>
+      <label style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-weight:400;">
+        <span><input type="checkbox" name="personalize_name" value="true" {{ 'checked' if product and product.personalize_name }}> Name</span>
+        <span><input type="checkbox" name="personalize_message" value="true" {{ 'checked' if product and product.personalize_message }}> Message</span>
+        <span><input type="checkbox" name="personalize_date" value="true" {{ 'checked' if product and product.personalize_date }}> Date</span>
+        <span><input type="checkbox" name="personalize_photo" value="true" {{ 'checked' if product and product.personalize_photo }}> Photo Upload</span>
+      </label>
+    </div>
+
     <input type="hidden" name="image_order" id="image-order-input" value="{% if product %}{{ product.images|map(attribute='id')|join(',') }}{% endif %}">
 
     {% if product and product.images %}

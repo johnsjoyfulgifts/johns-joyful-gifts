@@ -1,9 +1,18 @@
 """
-Cart is stored client-side in a signed cookie (product_id -> quantity only).
-Nothing about price or stock is trusted from the cookie: every read joins
-against the live Product table, and checkout re-validates everything again
-inside the order transaction. Worst case of a tampered cookie is a wrong
-quantity number, which checkout will clamp/reject anyway.
+Cart is stored client-side in a signed cookie. Each entry is either a bare
+int (the legacy quantity-only format, from before personalization existed —
+kept readable so this change never breaks a cart already sitting in a
+customer's browser) or the current shape: {"qty": int, "p": dict | None},
+where "p" holds whatever the customer entered in a product's personalization
+panel (name/message/date/photo url). Nothing about price, stock, or
+personalization options is trusted from the cookie: every read joins against
+the live Product table, and checkout re-validates everything again inside
+the order transaction.
+
+Personalized lines are always quantity 1 — one personalization applies to
+the whole line, so "3 of this mug" can never silently mean 3 different
+names. A customer wanting multiple different personalizations of the same
+product adds it to the cart again for each one.
 """
 
 from itsdangerous import BadSignature, URLSafeSerializer
@@ -19,11 +28,27 @@ MAX_QTY_PER_ITEM = 20
 _serializer = URLSafeSerializer(settings.secret_key, salt="cart")
 
 
-def serialize_cart(cart: dict[str, int]) -> str:
+def _normalize_entry(raw) -> dict:
+    if isinstance(raw, dict):
+        try:
+            qty = int(raw.get("qty", 0))
+        except (TypeError, ValueError):
+            qty = 0
+        personalization = raw.get("p") if isinstance(raw.get("p"), dict) else None
+        return {"qty": qty, "p": personalization}
+    # Legacy shape: the cookie value was just the quantity itself.
+    try:
+        qty = int(raw)
+    except (TypeError, ValueError):
+        qty = 0
+    return {"qty": qty, "p": None}
+
+
+def serialize_cart(cart: dict[str, dict]) -> str:
     return _serializer.dumps(cart)
 
 
-def read_cart(request) -> dict[str, int]:
+def read_cart(request) -> dict[str, dict]:
     token = request.cookies.get(CART_COOKIE_NAME)
     if not token:
         return {}
@@ -33,18 +58,18 @@ def read_cart(request) -> dict[str, int]:
         return {}
     if not isinstance(data, dict):
         return {}
-    cleaned: dict[str, int] = {}
-    for product_id, qty in data.items():
-        try:
-            qty_int = int(qty)
-        except (TypeError, ValueError):
+    cleaned: dict[str, dict] = {}
+    for product_id, raw in data.items():
+        entry = _normalize_entry(raw)
+        if entry["qty"] <= 0:
             continue
-        if qty_int > 0:
-            cleaned[str(product_id)] = min(qty_int, MAX_QTY_PER_ITEM)
+        max_qty = 1 if entry["p"] else MAX_QTY_PER_ITEM
+        entry["qty"] = min(entry["qty"], max_qty)
+        cleaned[str(product_id)] = entry
     return cleaned
 
 
-def write_cart(response, cart: dict[str, int]) -> None:
+def write_cart(response, cart: dict[str, dict]) -> None:
     token = _serializer.dumps(cart)
     response.set_cookie(
         key=CART_COOKIE_NAME,
@@ -57,26 +82,32 @@ def write_cart(response, cart: dict[str, int]) -> None:
     )
 
 
-def add_item(request, response, product_id: int, quantity: int) -> dict[str, int]:
+def add_item(request, response, product_id: int, quantity: int, personalization: dict | None = None) -> dict:
     cart = read_cart(request)
     key = str(product_id)
-    cart[key] = min(cart.get(key, 0) + max(quantity, 1), MAX_QTY_PER_ITEM)
+    if personalization:
+        cart[key] = {"qty": 1, "p": personalization}
+    else:
+        current_qty = cart.get(key, {}).get("qty", 0)
+        cart[key] = {"qty": min(current_qty + max(quantity, 1), MAX_QTY_PER_ITEM), "p": None}
     write_cart(response, cart)
     return cart
 
 
-def set_item_quantity(request, response, product_id: int, quantity: int) -> dict[str, int]:
+def set_item_quantity(request, response, product_id: int, quantity: int) -> dict:
     cart = read_cart(request)
     key = str(product_id)
     if quantity <= 0:
         cart.pop(key, None)
     else:
-        cart[key] = min(quantity, MAX_QTY_PER_ITEM)
+        existing = cart.get(key, {"qty": 0, "p": None})
+        max_qty = 1 if existing.get("p") else MAX_QTY_PER_ITEM
+        cart[key] = {"qty": min(quantity, max_qty), "p": existing.get("p")}
     write_cart(response, cart)
     return cart
 
 
-def remove_item(request, response, product_id: int) -> dict[str, int]:
+def remove_item(request, response, product_id: int) -> dict:
     cart = read_cart(request)
     cart.pop(str(product_id), None)
     write_cart(response, cart)
@@ -88,13 +119,14 @@ def clear_cart(response) -> None:
 
 
 class CartLine:
-    def __init__(self, product: Product, quantity: int):
+    def __init__(self, product: Product, quantity: int, personalization: dict | None = None):
         self.product = product
         self.quantity = quantity
         self.subtotal = round(product.price * quantity, 2)
+        self.personalization = personalization or {}
 
 
-def lines_for_cart(raw_cart: dict[str, int], db: Session) -> list[CartLine]:
+def lines_for_cart(raw_cart: dict[str, dict], db: Session) -> list[CartLine]:
     """Live view of a cart dict: drops products that were deleted/deactivated since being added."""
     if not raw_cart:
         return []
@@ -103,12 +135,13 @@ def lines_for_cart(raw_cart: dict[str, int], db: Session) -> list[CartLine]:
     products_by_id = {p.id: p for p in products}
 
     lines: list[CartLine] = []
-    for pid_str, qty in raw_cart.items():
+    for pid_str, entry in raw_cart.items():
         product = products_by_id.get(int(pid_str))
         if product is None or not product.active or product.deleted_at is not None:
             continue
+        qty = entry.get("qty", 0)
         capped_qty = min(qty, product.stock) if product.stock > 0 else qty
-        lines.append(CartLine(product, capped_qty))
+        lines.append(CartLine(product, capped_qty, entry.get("p")))
     return lines
 
 

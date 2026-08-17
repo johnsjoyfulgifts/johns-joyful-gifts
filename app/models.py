@@ -92,6 +92,14 @@ class Product(Base):
     new_arrival: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     sku: Mapped[str | None] = mapped_column(String(80), nullable=True, unique=True, index=True)
+    # Which personalization fields (if any) this product accepts. Each is its
+    # own flag rather than one "personalizable" bool + a config blob, so the
+    # admin form stays a plain checkbox group and the product page only ever
+    # renders the fields that actually apply to this product.
+    personalize_name: Mapped[bool] = mapped_column(Boolean, default=False)
+    personalize_message: Mapped[bool] = mapped_column(Boolean, default=False)
+    personalize_date: Mapped[bool] = mapped_column(Boolean, default=False)
+    personalize_photo: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
     # Soft delete: NULL = not deleted (the common case). A separate concept
@@ -119,6 +127,10 @@ class Product(Base):
     @property
     def primary_image(self) -> "ProductImage | None":
         return self.images[0] if self.images else None
+
+    @property
+    def is_personalizable(self) -> bool:
+        return self.personalize_name or self.personalize_message or self.personalize_date or self.personalize_photo
 
 
 class ProductImage(Base):
@@ -224,8 +236,25 @@ class OrderItem(Base):
     price_snapshot: Mapped[float] = mapped_column(Float)
     quantity: Mapped[int] = mapped_column(Integer)
     subtotal: Mapped[float] = mapped_column(Float)
+    # What the customer entered in the product's "Personalize This Gift"
+    # panel, captured at add-to-cart time and snapshotted here at checkout —
+    # never read back from the product, so it survives even if the product's
+    # personalization options change or are turned off later.
+    personalization_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    personalization_message: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    personalization_date: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    personalization_photo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     order: Mapped["Order"] = relationship(back_populates="items")
+
+    @property
+    def has_personalization(self) -> bool:
+        return bool(
+            self.personalization_name
+            or self.personalization_message
+            or self.personalization_date
+            or self.personalization_photo_url
+        )
 
 
 class OrderGiftOption(Base):

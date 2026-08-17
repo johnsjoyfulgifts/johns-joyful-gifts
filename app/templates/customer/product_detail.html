@@ -132,14 +132,53 @@
       </div>
 
       {% if product.in_stock %}
-      <form class="js-cart-form" action="/api/cart/add" method="post" data-reload-on-success="true" style="margin:18px 0;">
+      <form class="js-cart-form" action="/api/cart/add" method="post" enctype="multipart/form-data" data-reload-on-success="true" style="margin:18px 0;">
         <input type="hidden" name="product_id" value="{{ product.id }}">
+
+        {% if product.is_personalizable %}
+        <div class="personalize-panel">
+          <div class="personalize-panel__label">🎁 Personalize This Gift</div>
+          {% if product.personalize_name %}
+          <div class="form-group">
+            <label for="personalization_name">Name *</label>
+            <input class="form-control" type="text" id="personalization_name" name="personalization_name" maxlength="120" required>
+          </div>
+          {% endif %}
+          {% if product.personalize_message %}
+          <div class="form-group">
+            <label for="personalization_message">Message *</label>
+            <textarea class="form-control" id="personalization_message" name="personalization_message" rows="2" maxlength="300" required></textarea>
+          </div>
+          {% endif %}
+          {% if product.personalize_date %}
+          <div class="form-group">
+            <label for="personalization_date">Date *</label>
+            <input class="form-control" type="text" id="personalization_date" name="personalization_date" maxlength="60" placeholder="e.g. 25 Dec 2026" required>
+          </div>
+          {% endif %}
+          {% if product.personalize_photo %}
+          <div class="form-group">
+            <label for="personalization_photo">Photo *</label>
+            <input type="file" id="personalization_photo" name="personalization_photo" accept="image/jpeg,image/png,image/webp" capture="environment" required>
+          </div>
+          {% endif %}
+          <div class="personalize-preview" id="personalize-preview" hidden>
+            <p class="personalize-preview__label">You'll receive</p>
+            <div id="personalize-preview-body"></div>
+          </div>
+          <p class="field-hint" style="margin-bottom:0;">Personalized items are made specially for you — quantity is fixed at 1. Add it again to order another with different details.</p>
+        </div>
+        <input type="hidden" name="quantity" value="1">
+        {% endif %}
+
         <div class="flex items-center gap-12">
+          {% if not product.is_personalizable %}
           <div class="qty-stepper">
             <button type="button" data-qty-step="-1" aria-label="Decrease quantity">−</button>
             <input type="number" name="quantity" value="1" min="1" max="{{ product.stock }}" aria-label="Quantity">
             <button type="button" data-qty-step="1" aria-label="Increase quantity">+</button>
           </div>
+          {% endif %}
           <button type="submit" class="btn btn-primary">{{ t('add_to_cart', current_language) }}</button>
         </div>
         <a href="/checkout" class="btn btn-outline btn-block" style="margin-top:10px;" onclick="return false;" id="buy-now-link">{{ t('buy_now', current_language) }}</a>
@@ -293,6 +332,46 @@
       await fetch('/api/cart/add', { method: 'POST', body: fd, headers: { Accept: 'application/json' } });
       window.location.href = '/checkout';
     });
+  }
+
+  // Live "you'll receive" preview for the personalization panel, so the
+  // customer sees exactly what they've entered before it's added to cart.
+  var personalizePanel = document.querySelector('.personalize-panel');
+  if (personalizePanel) {
+    var preview = document.getElementById('personalize-preview');
+    var previewBody = document.getElementById('personalize-preview-body');
+    var nameInput = document.getElementById('personalization_name');
+    var messageInput = document.getElementById('personalization_message');
+    var dateInput = document.getElementById('personalization_date');
+    var photoInput = document.getElementById('personalization_photo');
+
+    function escapeHtml(str) {
+      var div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function updatePreview() {
+      var parts = [];
+      if (nameInput && nameInput.value.trim()) parts.push('<div><strong>Name:</strong> ' + escapeHtml(nameInput.value.trim()) + '</div>');
+      if (messageInput && messageInput.value.trim()) parts.push('<div><strong>Message:</strong> "' + escapeHtml(messageInput.value.trim()) + '"</div>');
+      if (dateInput && dateInput.value.trim()) parts.push('<div><strong>Date:</strong> ' + escapeHtml(dateInput.value.trim()) + '</div>');
+      if (photoInput && photoInput.files && photoInput.files[0]) {
+        var url = URL.createObjectURL(photoInput.files[0]);
+        parts.push('<div style="margin-top:4px;"><strong>Photo:</strong><br><img src="' + url + '" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:8px;margin-top:4px;"></div>');
+      }
+      if (parts.length) {
+        previewBody.innerHTML = parts.join('');
+        preview.hidden = false;
+      } else {
+        preview.hidden = true;
+      }
+    }
+
+    [nameInput, messageInput, dateInput].forEach(function (el) {
+      if (el) el.addEventListener('input', updatePreview);
+    });
+    if (photoInput) photoInput.addEventListener('change', updatePreview);
   }
 })();
 </script>

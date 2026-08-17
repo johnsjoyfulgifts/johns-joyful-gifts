@@ -49,21 +49,27 @@
 
   {% if occasions %}
   <section class="page-section">
-    <div class="section-tinted">
+    <div class="section-tinted section-tinted--category">
       <h2 class="section-title">🎉 Shop by Occasion</h2>
-      <div class="category-scroll">
-        {% for occ in occasions %}
-        <a class="category-chip" href="/occasion/{{ occ.slug }}">
-          <span class="category-chip__img">
-            {% if occ.image %}<img src="{{ occ.image }}" alt="">{% else %}🎉{% endif %}
-          </span>
-          {{ occ.name }}
-        </a>
-        {% endfor %}
+      <div class="category-card-row">
+        {% for occ in occasions %}{{ catcards.category_card(occ, url_prefix='occasion', default_icon='🎉') }}{% endfor %}
       </div>
     </div>
   </section>
   {% endif %}
+
+  <section class="page-section">
+    <div class="section-tinted">
+      <h2 class="section-title">💰 Shop by Budget</h2>
+      <div class="budget-pill-row">
+        <a class="budget-pill" href="/shop?max_price=299">Under ₹299</a>
+        <a class="budget-pill" href="/shop?max_price=499">Under ₹499</a>
+        <a class="budget-pill" href="/shop?max_price=999">Under ₹999</a>
+        <a class="budget-pill" href="/shop?max_price=1499">Under ₹1499</a>
+        <a class="budget-pill" href="/shop?min_price=1500">₹1500+</a>
+      </div>
+    </div>
+  </section>
 
   {% if not has_any_products %}
   <div class="empty-state">
