@@ -164,6 +164,25 @@
       <textarea class="form-control" id="about_text" name="about_text" rows="4">{{ values.about_text }}</textarea>
     </div>
 
+    <h2 style="font-size:1rem;">Legal Pages</h2>
+    <p class="field-hint" style="margin-top:-6px;">Shown at <code>/privacy-policy</code>, <code>/terms</code>, <code>/shipping-policy</code> and <code>/refund-policy</code>, and linked from the site footer. Plain text — blank lines become paragraph breaks.</p>
+    <div class="form-group">
+      <label for="privacy_policy_text">Privacy Policy</label>
+      <textarea class="form-control" id="privacy_policy_text" name="privacy_policy_text" rows="6">{{ values.privacy_policy_text }}</textarea>
+    </div>
+    <div class="form-group">
+      <label for="terms_text">Terms &amp; Conditions</label>
+      <textarea class="form-control" id="terms_text" name="terms_text" rows="6">{{ values.terms_text }}</textarea>
+    </div>
+    <div class="form-group">
+      <label for="shipping_policy_text">Shipping Policy</label>
+      <textarea class="form-control" id="shipping_policy_text" name="shipping_policy_text" rows="6">{{ values.shipping_policy_text }}</textarea>
+    </div>
+    <div class="form-group">
+      <label for="refund_policy_text">Cancellation / Refund Policy</label>
+      <textarea class="form-control" id="refund_policy_text" name="refund_policy_text" rows="6">{{ values.refund_policy_text }}</textarea>
+    </div>
+
     <button type="submit" class="btn btn-primary">Save Settings</button>
   </form>
 </div>

@@ -3,21 +3,6 @@
 {% block content %}
 <div class="container page-section" style="max-width:760px;">
   <h1 class="section-title">{{ page_title }}</h1>
-  <div class="card">
-    {% if policy == "privacy" %}
-      <p><em>This page is a placeholder. Please replace it with your business's actual privacy policy before going live.</em></p>
-      <p>{{ store.store_name }} collects only the information needed to process your order: name, mobile number, delivery address, and optionally email. This information is used solely to fulfil and communicate about your order, and is not sold to third parties.</p>
-      <p>Contact us via WhatsApp or the details on our <a href="/contact">Contact page</a> if you have questions about your data.</p>
-    {% elif policy == "terms" %}
-      <p><em>This page is a placeholder. Please replace it with your business's actual terms and conditions before going live.</em></p>
-      <p>By placing an order with {{ store.store_name }}, you agree to provide accurate delivery details and to pay for your order via the selected payment method (currently UPI / Bank Transfer). Product availability and prices are subject to change without notice, and orders are confirmed by the seller before dispatch.</p>
-    {% elif policy == "shipping" %}
-      <p><em>This page is a placeholder. Please replace it with your business's actual shipping details before going live.</em></p>
-      <p>Orders are typically dispatched within 1–3 business days of confirmation, depending on product availability and courier schedules. Delivery timelines vary by location and will be shared with you once your order is shipped, along with tracking details where available.</p>
-    {% elif policy == "refund" %}
-      <p><em>This page is a placeholder. Please replace it with your business's actual cancellation/refund policy before going live.</em></p>
-      <p>Orders can be cancelled before they are shipped by contacting us on WhatsApp with your order number. For damaged or incorrect items received, please contact us within 48 hours of delivery with photos, and we'll work with you on a replacement or refund.</p>
-    {% endif %}
-  </div>
+  <div class="card" style="white-space:pre-line;">{{ policy_text }}</div>
 </div>
 {% endblock %}

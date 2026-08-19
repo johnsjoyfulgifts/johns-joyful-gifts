@@ -900,6 +900,10 @@ def settings_submit(
     bank_account_number: str = Form(""),
     bank_ifsc: str = Form(""),
     bank_name: str = Form(""),
+    privacy_policy_text: str = Form(""),
+    terms_text: str = Form(""),
+    shipping_policy_text: str = Form(""),
+    refund_policy_text: str = Form(""),
     db: Session = Depends(get_db),
     admin: Admin = Depends(require_super_admin),
 ):
@@ -930,6 +934,10 @@ def settings_submit(
         "bank_account_number": bank_account_number.strip(),
         "bank_ifsc": bank_ifsc.strip(),
         "bank_name": bank_name.strip(),
+        "privacy_policy_text": privacy_policy_text.strip(),
+        "terms_text": terms_text.strip(),
+        "shipping_policy_text": shipping_policy_text.strip(),
+        "refund_policy_text": refund_policy_text.strip(),
     }
 
     if old_values.get("whatsapp_number") != new_values["whatsapp_number"]:

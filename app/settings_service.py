@@ -39,6 +39,27 @@ DEFAULTS: dict[str, str] = {
     "bank_account_number": "",
     "bank_ifsc": "",
     "bank_name": "",
+    "privacy_policy_text": (
+        "We collect only the information needed to process your order: name, mobile number, delivery address, "
+        "and optionally email. This information is used solely to fulfil and communicate about your order, and "
+        "is not sold to third parties.\n\n"
+        "Contact us via WhatsApp or the details on our Contact page if you have questions about your data."
+    ),
+    "terms_text": (
+        "By placing an order with us, you agree to provide accurate delivery details and to pay for your order "
+        "via the selected payment method. Product availability and prices are subject to change without notice, "
+        "and orders are confirmed by the seller before dispatch."
+    ),
+    "shipping_policy_text": (
+        "Orders are typically dispatched within 1–3 business days of confirmation, depending on product "
+        "availability and courier schedules. Delivery timelines vary by location and will be shared with you "
+        "once your order is shipped, along with tracking details where available."
+    ),
+    "refund_policy_text": (
+        "Orders can be cancelled before they are shipped by contacting us on WhatsApp with your order number. "
+        "For damaged or incorrect items received, please contact us within 48 hours of delivery with photos, "
+        "and we'll work with you on a replacement or refund."
+    ),
 }
 
 

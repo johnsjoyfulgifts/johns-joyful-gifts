@@ -532,22 +532,26 @@ def contact_page(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/privacy-policy")
 def privacy_policy(request: Request, db: Session = Depends(get_db)):
-    return render(request, "customer/legal.html", {"page_title": "Privacy Policy", "policy": "privacy"}, db)
+    text = get_all_settings(db).get("privacy_policy_text", "")
+    return render(request, "customer/legal.html", {"page_title": "Privacy Policy", "policy_text": text}, db)
 
 
 @router.get("/terms")
 def terms_page(request: Request, db: Session = Depends(get_db)):
-    return render(request, "customer/legal.html", {"page_title": "Terms & Conditions", "policy": "terms"}, db)
+    text = get_all_settings(db).get("terms_text", "")
+    return render(request, "customer/legal.html", {"page_title": "Terms & Conditions", "policy_text": text}, db)
 
 
 @router.get("/shipping-policy")
 def shipping_policy(request: Request, db: Session = Depends(get_db)):
-    return render(request, "customer/legal.html", {"page_title": "Shipping Policy", "policy": "shipping"}, db)
+    text = get_all_settings(db).get("shipping_policy_text", "")
+    return render(request, "customer/legal.html", {"page_title": "Shipping Policy", "policy_text": text}, db)
 
 
 @router.get("/refund-policy")
 def refund_policy(request: Request, db: Session = Depends(get_db)):
-    return render(request, "customer/legal.html", {"page_title": "Cancellation / Refund Policy", "policy": "refund"}, db)
+    text = get_all_settings(db).get("refund_policy_text", "")
+    return render(request, "customer/legal.html", {"page_title": "Cancellation / Refund Policy", "policy_text": text}, db)
 
 
 @router.get("/sitemap.xml")
