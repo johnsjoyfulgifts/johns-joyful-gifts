@@ -1,7 +1,7 @@
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.models import Product
+from app.models import Collection, Product
 
 PAGE_SIZE = 20
 
@@ -10,7 +10,16 @@ def base_active_query(db: Session):
     return db.query(Product).filter(Product.active.is_(True), Product.deleted_at.is_(None))
 
 
-def apply_filters(query, category_id=None, min_price=None, max_price=None, in_stock_only=False, search=None):
+def apply_filters(
+    query,
+    category_id=None,
+    min_price=None,
+    max_price=None,
+    in_stock_only=False,
+    search=None,
+    personalizable=False,
+    collection_slug=None,
+):
     if category_id is not None:
         query = query.filter(Product.category_id == category_id)
     if min_price is not None:
@@ -22,6 +31,12 @@ def apply_filters(query, category_id=None, min_price=None, max_price=None, in_st
     if search:
         like = f"%{search.strip()}%"
         query = query.filter(or_(Product.name.ilike(like), Product.short_description.ilike(like), Product.description.ilike(like), Product.sku.ilike(like)))
+    if personalizable:
+        query = query.filter(
+            or_(Product.personalize_name, Product.personalize_message, Product.personalize_date, Product.personalize_photo)
+        )
+    if collection_slug:
+        query = query.join(Product.collections).filter(Collection.slug == collection_slug)
     return query
 
 

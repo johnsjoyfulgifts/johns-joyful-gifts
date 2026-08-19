@@ -1,13 +1,14 @@
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.analytics import log_event
 from app.customer_auth import get_current_customer
 from app.database import get_db
-from app.models import Category, Collection, Product, Review
+from app.models import Category, Collection, Order, OrderItem, Product, Review, StockNotifyRequest
 from app.product_query import apply_filters, apply_sort, base_active_query, paginate
+from app.rate_limit import is_rate_limited
 from app.settings_service import get_all_settings
 from app.templating import render
 
@@ -74,6 +75,17 @@ def home(request: Request, db: Session = Depends(get_db)):
 
     has_any_products = base_active_query(db).count() > 0
 
+    # Top-rated approved reviews across the whole catalog, for homepage
+    # social proof — highest rating first, then most recent.
+    top_reviews = (
+        db.query(Review)
+        .options(joinedload(Review.customer), joinedload(Review.product))
+        .filter(Review.approved.is_(True), Review.rating >= 4)
+        .order_by(Review.rating.desc(), Review.created_at.desc())
+        .limit(6)
+        .all()
+    )
+
     return render(
         request,
         "customer/home.html",
@@ -86,9 +98,21 @@ def home(request: Request, db: Session = Depends(get_db)):
             "occasions": occasions,
             "age_groups": age_groups,
             "has_any_products": has_any_products,
+            "top_reviews": top_reviews,
         },
         db,
     )
+
+
+@router.get("/gift-finder")
+def gift_finder_page(request: Request, db: Session = Depends(get_db)):
+    occasions = (
+        db.query(Collection)
+        .filter(Collection.kind == "occasion", Collection.active.is_(True))
+        .order_by(Collection.sort_order, Collection.name)
+        .all()
+    )
+    return render(request, "customer/gift_finder.html", {"occasions": occasions}, db)
 
 
 @router.get("/shop")
@@ -101,6 +125,8 @@ def shop(
     in_stock: bool = False,
     sort: str | None = None,
     page: int = 1,
+    personalizable: bool = False,
+    collection: str | None = None,
     db: Session = Depends(get_db),
 ):
     category_obj = None
@@ -117,6 +143,8 @@ def shop(
         max_price=max_price,
         in_stock_only=in_stock,
         search=q or None,
+        personalizable=personalizable,
+        collection_slug=collection or None,
     )
     query = apply_sort(query, sort)
     items, total, total_pages, page = paginate(query, page)
@@ -141,7 +169,7 @@ def shop(
                 "in_stock": in_stock,
                 "sort": sort or "",
             },
-            "has_active_filters": bool(q or category or min_price or max_price or in_stock or sort),
+            "has_active_filters": bool(q or category or min_price or max_price or in_stock or sort or personalizable or collection),
             "page_title": category_obj.name if category_obj else "All Products",
         },
         db,
@@ -191,6 +219,8 @@ def category_page(slug: str, request: Request, page: int = 1, sort: str | None =
             "filters": {"q": "", "category": slug, "min_price": None, "max_price": None, "in_stock": False, "sort": sort or ""},
             "has_active_filters": bool(sort),
             "page_title": category_obj.name,
+            "page_meta_title": category_obj.meta_title,
+            "page_meta_description": category_obj.meta_description,
         },
         db,
     )
@@ -344,13 +374,39 @@ def product_detail(slug: str, request: Request, db: Session = Depends(get_db)):
     review_count = len(approved_reviews)
     average_rating = round(sum(r.rating for r in approved_reviews) / review_count, 1) if review_count else 0
 
+    # "Verified Purchase" — did this reviewer actually order this product?
+    # One query for every review on the page rather than one per review.
+    reviewer_ids = [r.customer_id for r in approved_reviews]
+    verified_customer_ids = (
+        {
+            cid
+            for (cid,) in db.query(Order.customer_id)
+            .join(OrderItem, OrderItem.order_id == Order.id)
+            .filter(Order.customer_id.in_(reviewer_ids), OrderItem.product_id == product.id)
+            .distinct()
+            .all()
+        }
+        if reviewer_ids
+        else set()
+    )
+    for r in approved_reviews:
+        r.is_verified = r.customer_id in verified_customer_ids
+
     my_review = None
+    notify_requested = False
     if current_customer is not None:
         my_review = (
             db.query(Review)
             .filter(Review.product_id == product.id, Review.customer_id == current_customer.id)
             .first()
         )
+        if not product.in_stock:
+            notify_requested = (
+                db.query(StockNotifyRequest)
+                .filter(StockNotifyRequest.product_id == product.id, StockNotifyRequest.customer_id == current_customer.id)
+                .first()
+                is not None
+            )
 
     return render(
         request,
@@ -364,8 +420,94 @@ def product_detail(slug: str, request: Request, db: Session = Depends(get_db)):
             "average_rating": average_rating,
             "my_review": my_review,
             "review_submitted": request.query_params.get("review") == "submitted",
+            "notify_requested": notify_requested,
         },
         db,
+    )
+
+
+@router.post("/product/{slug}/notify-me")
+def notify_me_request(slug: str, request: Request, mobile: str = Form(...), db: Session = Depends(get_db)):
+    current_customer = get_current_customer(request, db)
+    if current_customer is None:
+        return RedirectResponse(url=f"/login?next=/product/{slug}", status_code=303)
+
+    client_ip = request.client.host if request.client else "unknown"
+    if is_rate_limited(f"notify-me:{client_ip}", max_attempts=20, window_seconds=300):
+        return RedirectResponse(url=f"/product/{slug}?notify=ratelimited", status_code=303)
+
+    product = db.query(Product).filter(Product.slug == slug).first()
+    if product is None:
+        return RedirectResponse(url="/shop", status_code=303)
+
+    mobile = mobile.strip()[:20]
+    existing = (
+        db.query(StockNotifyRequest)
+        .filter(StockNotifyRequest.product_id == product.id, StockNotifyRequest.customer_id == current_customer.id)
+        .first()
+    )
+    if existing is None:
+        db.add(StockNotifyRequest(product_id=product.id, customer_id=current_customer.id, mobile=mobile))
+        db.commit()
+
+    return RedirectResponse(url=f"/product/{slug}?notify=requested", status_code=303)
+
+
+@router.get("/api/products/{slug}/quick-view")
+def quick_view(slug: str, db: Session = Depends(get_db)):
+    """Lightweight JSON for the desktop Quick View modal — deliberately a
+    subset of the full product page (no reviews/related/SEO data), since
+    it's rendered client-side inside a popup, not indexed or linked to."""
+    product = base_active_query(db).options(joinedload(Product.images)).filter(Product.slug == slug).first()
+    if product is None:
+        return JSONResponse({"detail": "Not found"}, status_code=404)
+
+    return JSONResponse(
+        {
+            "slug": product.slug,
+            "name": product.name,
+            "price": product.price,
+            "original_price": product.original_price,
+            "discount_percent": product.discount_percent,
+            "description": (product.description or "")[:280],
+            "image": product.primary_image.display_thumbnail if product.primary_image else None,
+            "in_stock": product.in_stock,
+            "stock": product.stock,
+            "is_personalizable": product.is_personalizable,
+            "url": f"/product/{product.slug}",
+        }
+    )
+
+
+@router.get("/api/products/recently-viewed")
+def recently_viewed(slugs: str = "", db: Session = Depends(get_db)):
+    """Client sends the slugs it has in localStorage; this just re-hydrates
+    them with live name/price/image (never trusts stale client-cached data)
+    and drops anything no longer active — no server-side tracking involved."""
+    slug_list = [s.strip() for s in slugs.split(",") if s.strip()][:10]
+    if not slug_list:
+        return JSONResponse({"products": []})
+
+    products = (
+        base_active_query(db)
+        .options(joinedload(Product.images))
+        .filter(Product.slug.in_(slug_list))
+        .all()
+    )
+    by_slug = {p.slug: p for p in products}
+    ordered = [by_slug[s] for s in slug_list if s in by_slug]
+    return JSONResponse(
+        {
+            "products": [
+                {
+                    "slug": p.slug,
+                    "name": p.name,
+                    "price": p.price,
+                    "image": p.primary_image.display_thumbnail if p.primary_image else None,
+                }
+                for p in ordered
+            ]
+        }
     )
 
 

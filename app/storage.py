@@ -113,6 +113,19 @@ def save_product_image(upload: UploadFile) -> tuple[str, str]:
     return image_url, thumbnail_url
 
 
+def save_review_photo(upload: UploadFile) -> str:
+    """Validates and uploads a customer's review photo to Supabase Storage.
+    Same bucket, under a reviews/ prefix, sized like a product thumbnail
+    since it's only ever shown small in a review card."""
+    image = _validate_and_load_image(upload)
+
+    if max(image.size) > THUMBNAIL_DIMENSION:
+        image.thumbnail((THUMBNAIL_DIMENSION, THUMBNAIL_DIMENSION))
+
+    filename = f"reviews/{uuid.uuid4().hex}.{OUTPUT_EXT}"
+    return _upload(filename, _encode(image, THUMBNAIL_QUALITY), OUTPUT_CONTENT_TYPE)
+
+
 def save_avatar_image(upload: UploadFile) -> str:
     """Validates and uploads a customer profile picture to Supabase Storage
     (same bucket as product images, under an avatars/ prefix — one small

@@ -1,0 +1,37 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Notify Requests — Admin{% endblock %}
+{% block page_title %}Notify Requests{% endblock %}
+
+{% block admin_content %}
+<p class="text-muted" style="font-size:0.85rem;margin-top:-8px;">Customers waiting to hear when an out-of-stock product is back. No automated messages are sent — restock the product, then reach out over WhatsApp/phone and mark it as notified.</p>
+
+{% if requests %}
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead><tr><th>Product</th><th>Customer</th><th>Mobile</th><th>Requested</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for r in requests %}
+      <tr>
+        <td>{% if r.product %}<a href="/product/{{ r.product.slug }}" target="_blank">{{ r.product.name }}</a>{% else %}<span class="text-muted">Deleted product</span>{% endif %}</td>
+        <td>{{ r.customer.name if r.customer else '—' }}</td>
+        <td><a href="https://wa.me/{{ r.mobile|replace(' ', '')|replace('+', '') }}" target="_blank" rel="noopener">{{ r.mobile }}</a></td>
+        <td class="text-muted">{{ r.created_at.strftime('%d %b %Y') }}</td>
+        <td>
+          {% if r.notified_at %}<span class="badge badge--success">Notified</span>{% else %}<span class="badge badge--warning">Pending</span>{% endif %}
+        </td>
+        <td>
+          {% if not r.notified_at %}
+          <form method="post" action="/admin/notify-requests/{{ r.id }}/mark-notified" style="display:inline;">
+            <button type="submit" class="btn btn-sm btn-secondary">Mark Notified</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state"><h3>No notify requests yet.</h3><p>When an out-of-stock product gets a "Notify Me" click, it'll show up here.</p></div>
+{% endif %}
+{% endblock %}

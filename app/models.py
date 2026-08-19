@@ -60,6 +60,8 @@ class Category(Base):
     image: Mapped[str | None] = mapped_column(String(500), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    meta_title: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    meta_description: Mapped[str | None] = mapped_column(String(300), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     products: Mapped[list["Product"]] = relationship(back_populates="category")
@@ -92,6 +94,8 @@ class Product(Base):
     new_arrival: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     sku: Mapped[str | None] = mapped_column(String(80), nullable=True, unique=True, index=True)
+    meta_title: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    meta_description: Mapped[str | None] = mapped_column(String(300), nullable=True)
     # Which personalization fields (if any) this product accepts. Each is its
     # own flag rather than one "personalizable" bool + a config blob, so the
     # admin form stays a plain checkbox group and the product page only ever
@@ -292,6 +296,7 @@ class Review(Base):
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), index=True)
     rating: Mapped[int] = mapped_column(Integer)
     review_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    photo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     # Admin moderates every review before it's public — a submission (new or
     # edited) always starts unapproved, even if a prior version of the same
     # customer's review for this product had already been approved.
@@ -611,6 +616,91 @@ class InvoiceGiftOption(Base):
     price_snapshot: Mapped[float] = mapped_column(Float)
 
     invoice: Mapped["Invoice"] = relationship(back_populates="gift_options")
+
+
+class ProductBundle(Base):
+    """Admin-curated "Gift Combo" — a fixed set of existing products shown
+    together with a stated combo value. Adding a bundle to cart adds each
+    constituent product at its own live price (no separate pricing/discount
+    engine); `bundle_price`, when set, is purely informational — the savings
+    pitch shown on the bundle page, not what checkout actually charges."""
+
+    __tablename__ = "product_bundles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    slug: Mapped[str] = mapped_column(String(220), unique=True, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bundle_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    image: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+    items: Mapped[list["ProductBundleItem"]] = relationship(back_populates="bundle", cascade="all, delete-orphan", order_by="ProductBundleItem.id")
+
+    @property
+    def individual_total(self) -> float:
+        return round(sum(item.product.price * item.quantity for item in self.items if item.product), 2)
+
+    @property
+    def savings(self) -> float | None:
+        if self.bundle_price is None:
+            return None
+        return round(max(self.individual_total - self.bundle_price, 0), 2)
+
+
+class ProductBundleItem(Base):
+    __tablename__ = "product_bundle_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    bundle_id: Mapped[int] = mapped_column(ForeignKey("product_bundles.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    quantity: Mapped[int] = mapped_column(Integer, default=1)
+
+    bundle: Mapped["ProductBundle"] = relationship(back_populates="items")
+    product: Mapped["Product"] = relationship()
+
+
+class StockNotifyRequest(Base):
+    """A customer's request to be told when an out-of-stock product is back.
+    No automated email/SMS exists in this app, so this is surfaced to the
+    admin as a plain list to work through manually over WhatsApp — the same
+    manual-outreach pattern already used for enquiries."""
+
+    __tablename__ = "stock_notify_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), index=True)
+    mobile: Mapped[str] = mapped_column(String(20))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    product: Mapped["Product"] = relationship()
+    customer: Mapped["Customer"] = relationship()
+
+    __table_args__ = (UniqueConstraint("product_id", "customer_id", name="uq_notify_product_customer"),)
+
+
+class AbandonedCartLead(Base):
+    """One row per logged-in customer, upserted whenever they view their
+    cart with items in it — there's no background worker to detect
+    abandonment on a timer, so "abandoned" is instead computed at read time
+    in the admin view (last_updated older than a threshold, no order placed
+    since). Deleted the moment that customer's checkout succeeds, since a
+    completed order is the opposite of abandoned."""
+
+    __tablename__ = "abandoned_cart_leads"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), unique=True, index=True)
+    cart_summary: Mapped[str] = mapped_column(Text)
+    item_count: Mapped[int] = mapped_column(Integer, default=0)
+    subtotal: Mapped[float] = mapped_column(Float, default=0)
+    last_updated: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    customer: Mapped["Customer"] = relationship()
 
 
 Index("ix_orders_status_created", Order.order_status, Order.created_at)

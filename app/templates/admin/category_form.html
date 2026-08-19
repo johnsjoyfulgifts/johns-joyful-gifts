@@ -19,6 +19,14 @@
       <label><input type="checkbox" name="active" value="true" {{ 'checked' if not category or category.active }}> Active (visible to customers)</label>
     </div>
     <div class="form-group">
+      <label for="meta_title">SEO Title (optional)</label>
+      <input class="form-control" id="meta_title" name="meta_title" maxlength="160" value="{{ category.meta_title if category and category.meta_title else '' }}" placeholder="{{ category.name if category else 'Defaults to the category name' }}">
+    </div>
+    <div class="form-group">
+      <label for="meta_description">SEO Description (optional)</label>
+      <textarea class="form-control" id="meta_description" name="meta_description" rows="2" maxlength="300">{{ category.meta_description if category and category.meta_description else '' }}</textarea>
+    </div>
+    <div class="form-group">
       <label for="image">Category Image (optional)</label>
       {% if category and category.image %}<div class="thumb-preview" style="margin-bottom:8px;"><img src="{{ category.image }}" alt=""></div>{% endif %}
       <input class="form-control" id="image" type="file" name="image" accept="image/jpeg,image/png,image/webp">

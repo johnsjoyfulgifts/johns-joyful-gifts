@@ -16,6 +16,7 @@
       {% if product.is_personalizable %}<span class="product-card__badge product-card__badge--personalize">🎁 Personalize</span>{% endif %}
     </div>
     <button type="button" class="wishlist-heart js-wishlist-toggle" data-product-id="{{ product.id }}" aria-label="Save to wishlist" aria-pressed="false">🤍</button>
+    <button type="button" class="quick-view-btn js-quick-view" data-quick-view-slug="{{ product.slug }}" aria-label="Quick view {{ product.name }}">👁️ Quick View</button>
   </div>
   <div class="product-card__body">
     <a href="/product/{{ product.slug }}"><div class="product-card__name">{{ product.name }}</div></a>

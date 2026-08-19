@@ -26,6 +26,7 @@ from app.database import get_db
 from app.i18n import SUPPORTED_LANGUAGES
 from app.rate_limit import is_rate_limited
 from app.models import (
+    AbandonedCartLead,
     Admin,
     AuditLog,
     Category,
@@ -39,10 +40,13 @@ from app.models import (
     OrderStatus,
     OrderStatusHistory,
     Product,
+    ProductBundle,
+    ProductBundleItem,
     ProductEvent,
     ProductImage,
     Quotation,
     Review,
+    StockNotifyRequest,
     now_utc,
     product_collections,
 )
@@ -243,6 +247,8 @@ def category_new_submit(
     name: str = Form(...),
     sort_order: int = Form(0),
     active: bool = Form(False),
+    meta_title: str = Form(""),
+    meta_description: str = Form(""),
     image: UploadFile = FastAPIFile(default=None),
     db: Session = Depends(get_db),
     admin: Admin = Depends(require_product_admin),
@@ -262,7 +268,15 @@ def category_new_submit(
                 request, "admin/category_form.html", {"active_nav": "categories", "category": None, "error": exc.detail}, db, status_code=400
             )
 
-    category = Category(name=name, slug=unique_slug(db, Category, name), sort_order=sort_order, active=active, image=image_url)
+    category = Category(
+        name=name,
+        slug=unique_slug(db, Category, name),
+        sort_order=sort_order,
+        active=active,
+        image=image_url,
+        meta_title=meta_title.strip() or None,
+        meta_description=meta_description.strip() or None,
+    )
     db.add(category)
     db.commit()
     return RedirectResponse(url="/admin/categories", status_code=303)
@@ -283,6 +297,8 @@ def category_edit_submit(
     name: str = Form(...),
     sort_order: int = Form(0),
     active: bool = Form(False),
+    meta_title: str = Form(""),
+    meta_description: str = Form(""),
     image: UploadFile = FastAPIFile(default=None),
     db: Session = Depends(get_db),
     admin: Admin = Depends(require_product_admin),
@@ -313,6 +329,8 @@ def category_edit_submit(
     category.name = name
     category.sort_order = sort_order
     category.active = active
+    category.meta_title = meta_title.strip() or None
+    category.meta_description = meta_description.strip() or None
     db.commit()
     return RedirectResponse(url="/admin/categories", status_code=303)
 
@@ -530,6 +548,8 @@ async def product_new_submit(
     name: str = Form(...),
     description: str = Form(""),
     short_description: str = Form(""),
+    meta_title: str = Form(""),
+    meta_description: str = Form(""),
     category_id: str = Form(""),
     price: float = Form(...),
     original_price: str = Form(""),
@@ -582,6 +602,8 @@ async def product_new_submit(
         slug=unique_slug(db, Product, name),
         description=description or None,
         short_description=short_description or None,
+        meta_title=meta_title.strip() or None,
+        meta_description=meta_description.strip() or None,
         category_id=int(category_id) if category_id else None,
         price=price,
         original_price=float(original_price) if original_price else None,
@@ -630,6 +652,8 @@ async def product_edit_submit(
     name: str = Form(...),
     description: str = Form(""),
     short_description: str = Form(""),
+    meta_title: str = Form(""),
+    meta_description: str = Form(""),
     category_id: str = Form(""),
     price: float = Form(...),
     original_price: str = Form(""),
@@ -716,6 +740,8 @@ async def product_edit_submit(
     product.name = name
     product.description = description or None
     product.short_description = short_description or None
+    product.meta_title = meta_title.strip() or None
+    product.meta_description = meta_description.strip() or None
     product.category_id = int(category_id) if category_id else None
     product.price = price
     product.original_price = float(original_price) if original_price else None
@@ -1358,6 +1384,166 @@ def gift_option_delete(gift_option_id: int, db: Session = Depends(get_db), admin
     return RedirectResponse(url="/admin/gift-options", status_code=303)
 
 
+# ---------- Gift Combos ----------
+
+def _bundle_form_context(db: Session, bundle=None, error=None) -> dict:
+    products = db.query(Product).filter(Product.active.is_(True), Product.deleted_at.is_(None)).order_by(Product.name).all()
+    selected_qty = {item.product_id: item.quantity for item in bundle.items} if bundle else {}
+    return {"active_nav": "bundles", "bundle": bundle, "products": products, "selected_qty": selected_qty, "error": error}
+
+
+@router.get("/bundles")
+def bundles_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
+    bundles = db.query(ProductBundle).options(joinedload(ProductBundle.items)).order_by(ProductBundle.sort_order, ProductBundle.name).all()
+    return render_admin(request, "admin/bundles_list.html", {"active_nav": "bundles", "bundles": bundles}, db)
+
+
+@router.get("/bundles/new")
+def bundle_new_page(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
+    return render_admin(request, "admin/bundle_form.html", _bundle_form_context(db), db)
+
+
+def _parse_bundle_items(form_items: dict) -> list[tuple[int, int]]:
+    """form_items: {'product_qty_12': '2', ...} -> [(12, 2), ...], skipping blank/zero quantities."""
+    items = []
+    for key, value in form_items.items():
+        if not key.startswith("product_qty_") or not value or not value.strip():
+            continue
+        try:
+            qty = int(value)
+            product_id = int(key[len("product_qty_"):])
+        except ValueError:
+            continue
+        if qty > 0:
+            items.append((product_id, qty))
+    return items
+
+
+@router.post("/bundles/new")
+async def bundle_new_submit(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    bundle_price: str = Form(""),
+    sort_order: int = Form(0),
+    active: bool = Form(False),
+    image: UploadFile = FastAPIFile(default=None),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(require_product_admin),
+):
+    name = name.strip()
+    form = await request.form()
+    items = _parse_bundle_items(dict(form))
+
+    if not name:
+        return render_admin(request, "admin/bundle_form.html", _bundle_form_context(db, error="Name is required."), db, status_code=400)
+    if len(items) < 2:
+        return render_admin(
+            request, "admin/bundle_form.html", _bundle_form_context(db, error="Select at least 2 products (with a quantity) for a combo."), db, status_code=400
+        )
+
+    image_url = None
+    if image is not None and image.filename:
+        try:
+            image_url, _ = save_product_image(image)
+        except UploadValidationError as exc:
+            return render_admin(request, "admin/bundle_form.html", _bundle_form_context(db, error=exc.detail), db, status_code=400)
+
+    bundle = ProductBundle(
+        name=name,
+        slug=unique_slug(db, ProductBundle, name),
+        description=description.strip() or None,
+        bundle_price=float(bundle_price) if bundle_price else None,
+        image=image_url,
+        active=active,
+        sort_order=sort_order,
+    )
+    db.add(bundle)
+    db.flush()
+    for product_id, qty in items:
+        db.add(ProductBundleItem(bundle_id=bundle.id, product_id=product_id, quantity=qty))
+    log_activity(db, admin, "bundle.created", f"Created gift combo '{bundle.name}'")
+    db.commit()
+    return RedirectResponse(url="/admin/bundles", status_code=303)
+
+
+@router.get("/bundles/{bundle_id}/edit")
+def bundle_edit_page(bundle_id: int, request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
+    bundle = db.query(ProductBundle).options(joinedload(ProductBundle.items)).filter(ProductBundle.id == bundle_id).first()
+    if bundle is None:
+        return RedirectResponse(url="/admin/bundles", status_code=303)
+    return render_admin(request, "admin/bundle_form.html", _bundle_form_context(db, bundle=bundle), db)
+
+
+@router.post("/bundles/{bundle_id}/edit")
+async def bundle_edit_submit(
+    bundle_id: int,
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    bundle_price: str = Form(""),
+    sort_order: int = Form(0),
+    active: bool = Form(False),
+    image: UploadFile = FastAPIFile(default=None),
+    db: Session = Depends(get_db),
+    admin: Admin = Depends(require_product_admin),
+):
+    bundle = db.query(ProductBundle).options(joinedload(ProductBundle.items)).filter(ProductBundle.id == bundle_id).first()
+    if bundle is None:
+        return RedirectResponse(url="/admin/bundles", status_code=303)
+
+    name = name.strip()
+    form = await request.form()
+    items = _parse_bundle_items(dict(form))
+
+    if not name:
+        return render_admin(request, "admin/bundle_form.html", _bundle_form_context(db, bundle=bundle, error="Name is required."), db, status_code=400)
+    if len(items) < 2:
+        return render_admin(
+            request, "admin/bundle_form.html", _bundle_form_context(db, bundle=bundle, error="Select at least 2 products (with a quantity) for a combo."), db, status_code=400
+        )
+
+    if image is not None and image.filename:
+        try:
+            new_image_url, _ = save_product_image(image)
+        except UploadValidationError as exc:
+            return render_admin(request, "admin/bundle_form.html", _bundle_form_context(db, bundle=bundle, error=exc.detail), db, status_code=400)
+        if bundle.image:
+            delete_product_image(bundle.image)
+        bundle.image = new_image_url
+
+    if name != bundle.name:
+        bundle.slug = unique_slug(db, ProductBundle, name, exclude_id=bundle.id)
+    bundle.name = name
+    bundle.description = description.strip() or None
+    bundle.bundle_price = float(bundle_price) if bundle_price else None
+    bundle.sort_order = sort_order
+    bundle.active = active
+
+    for item in list(bundle.items):
+        db.delete(item)
+    db.flush()
+    for product_id, qty in items:
+        db.add(ProductBundleItem(bundle_id=bundle.id, product_id=product_id, quantity=qty))
+
+    log_activity(db, admin, "bundle.updated", f"Updated gift combo '{bundle.name}'", "bundle", bundle.id)
+    db.commit()
+    return RedirectResponse(url="/admin/bundles", status_code=303)
+
+
+@router.post("/bundles/{bundle_id}/delete")
+def bundle_delete(bundle_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_product_admin)):
+    bundle = db.get(ProductBundle, bundle_id)
+    if bundle is not None:
+        name = bundle.name
+        if bundle.image:
+            delete_product_image(bundle.image)
+        db.delete(bundle)
+        log_activity(db, admin, "bundle.deleted", f"Deleted gift combo '{name}'")
+        db.commit()
+    return RedirectResponse(url="/admin/bundles", status_code=303)
+
+
 # ---------- Reviews ----------
 
 @router.get("/reviews")
@@ -1689,3 +1875,38 @@ def customer_reset_password(
         customer.password_hash = hash_password(new_password)
         db.commit()
     return RedirectResponse(url=referer, status_code=303)
+
+
+# ---------- Notify Requests ----------
+
+@router.get("/notify-requests")
+def notify_requests_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_order_admin)):
+    requests_ = (
+        db.query(StockNotifyRequest)
+        .options(joinedload(StockNotifyRequest.product), joinedload(StockNotifyRequest.customer))
+        .order_by(StockNotifyRequest.notified_at.is_not(None), StockNotifyRequest.created_at.desc())
+        .all()
+    )
+    return render_admin(request, "admin/notify_requests_list.html", {"active_nav": "notify-requests", "requests": requests_}, db)
+
+
+@router.post("/notify-requests/{request_id}/mark-notified")
+def notify_request_mark_notified(request_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_order_admin)):
+    notify_request = db.get(StockNotifyRequest, request_id)
+    if notify_request is not None and notify_request.notified_at is None:
+        notify_request.notified_at = now_utc()
+        db.commit()
+    return RedirectResponse(url="/admin/notify-requests", status_code=303)
+
+
+# ---------- Abandoned Carts ----------
+
+@router.get("/abandoned-carts")
+def abandoned_carts_list(request: Request, db: Session = Depends(get_db), admin: Admin = Depends(require_order_admin)):
+    leads = (
+        db.query(AbandonedCartLead)
+        .options(joinedload(AbandonedCartLead.customer))
+        .order_by(AbandonedCartLead.last_updated.desc())
+        .all()
+    )
+    return render_admin(request, "admin/abandoned_carts_list.html", {"active_nav": "abandoned-carts", "leads": leads}, db)

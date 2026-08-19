@@ -2,6 +2,7 @@
 {% import "customer/_product_card.html" as cards with context %}
 {% import "customer/_category_card.html" as catcards %}
 {% import "_whatsapp_icon.html" as wa %}
+{% import "_stars.html" as stars_macro %}
 
 {% block content %}
 <div class="container">
@@ -82,6 +83,18 @@
     </div>
   </section>
 
+  <section class="page-section">
+    <a href="/gift-finder" class="finder-cta">
+      <div class="finder-cta__text">
+        <div class="finder-cta__title">🎯 Not sure what to get?</div>
+        <div class="finder-cta__sub">Answer 4 quick questions and let us find the perfect gift for you.</div>
+      </div>
+      <span class="finder-cta__arrow">→</span>
+    </a>
+  </section>
+
+  <div id="recently-viewed-row" hidden></div>
+
   {% if not has_any_products %}
   <div class="empty-state">
     <div class="empty-state__icon">🎁</div>
@@ -134,6 +147,25 @@
     </div>
     <div class="product-grid">
       {% for p in special_offers %}{{ cards.product_card(p) }}{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if top_reviews %}
+  <section class="page-section">
+    <h2 class="section-title">💬 What Customers Say</h2>
+    <div class="home-reviews-row">
+      {% for r in top_reviews %}
+      <div class="home-review-card">
+        <div style="color:var(--color-accent);">{{ stars_macro.stars(r.rating) }}</div>
+        {% if r.review_text %}<p class="home-review-card__text">"{{ r.review_text }}"</p>{% endif %}
+        {% if r.photo_url %}<img src="{{ r.photo_url }}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px;margin:6px 0;">{% endif %}
+        <div class="home-review-card__meta">
+          <strong>{{ r.customer.name }}</strong>
+          {% if r.product %}<a href="/product/{{ r.product.slug }}" class="text-muted">on {{ r.product.name }}</a>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
     </div>
   </section>
   {% endif %}

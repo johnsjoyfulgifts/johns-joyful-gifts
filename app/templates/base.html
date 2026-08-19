@@ -30,7 +30,7 @@
   {% block extra_head %}{% endblock %}
 </head>
 {% import "_whatsapp_icon.html" as wa %}
-<body>
+<body data-recently-viewed-slug="{{ product.slug if product is defined and product else '' }}">
   <a href="#main-content" class="skip-link">Skip to main content</a>
 
   {% if store.announcement_enabled == 'true' and store.announcement_text %}
@@ -90,6 +90,8 @@
     <nav class="site-nav" aria-label="Product categories">
       <ul class="site-nav__list">
         <li><a href="/shop">All Products</a></li>
+        <li><a href="/gift-finder">🎯 Gift Finder</a></li>
+        <li><a href="/combos">🎀 Gift Combos</a></li>
         {% for cat in nav_categories %}
         <li><a href="/category/{{ cat.slug }}">{{ cat.name }}</a></li>
         {% endfor %}
@@ -106,6 +108,8 @@
     <ul class="mobile-drawer__list">
       <li><a href="/">🏠 Home</a></li>
       <li><a href="/shop">🛍️ Shop All</a></li>
+      <li><a href="/gift-finder">🎯 Gift Finder</a></li>
+      <li><a href="/combos">🎀 Gift Combos</a></li>
       <li><a href="/wishlist">❤️ Wishlist</a></li>
       <li><a href="/cart">🛒 Cart</a></li>
       <li><a href="{{ '/account' if current_customer else '/login' }}">👤 {{ 'My Account' if current_customer else 'Log In' }}</a></li>
@@ -139,6 +143,13 @@
     <a href="/cart" class="bottom-nav__item {{ 'active' if request.url.path == '/cart' }}"><span class="bottom-nav__icon">🛒{% if cart_count %}<span class="cart-badge" style="top:-6px;right:-10px;">{{ cart_count }}</span>{% endif %}</span>Cart</a>
     <a href="{{ '/account' if current_customer else '/login' }}" class="bottom-nav__item {{ 'active' if request.url.path in ('/account', '/login') }}"><span class="bottom-nav__icon">👤</span>{{ 'Account' if current_customer else 'Log In' }}</a>
   </nav>
+
+  <div class="quick-view-overlay" id="quick-view-overlay" hidden>
+    <div class="quick-view-modal" role="dialog" aria-modal="true" aria-label="Quick view">
+      <button type="button" class="quick-view-modal__close" id="quick-view-close" aria-label="Close quick view">×</button>
+      <div class="quick-view-modal__body" id="quick-view-body"></div>
+    </div>
+  </div>
 
   <footer class="site-footer">
     <div class="container">
@@ -184,6 +195,8 @@
   </footer>
 
   <script src="/static/js/cart.js"></script>
+  <script src="/static/js/recently-viewed.js"></script>
+  <script src="/static/js/quick-view.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {

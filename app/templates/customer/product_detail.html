@@ -2,11 +2,11 @@
 {% import "customer/_product_card.html" as cards with context %}
 {% import "_whatsapp_icon.html" as wa %}
 {% import "_stars.html" as stars_macro %}
-{% block title %}{{ product.name }} — {{ store.store_name }}{% endblock %}
-{% block meta_description %}{{ product.short_description or product.name }}{% endblock %}
+{% block title %}{{ product.meta_title or product.name }} — {{ store.store_name }}{% endblock %}
+{% block meta_description %}{{ product.meta_description or product.short_description or product.name }}{% endblock %}
 
 {% block extra_head %}
-<meta property="og:title" content="{{ product.name }}">
+<meta property="og:title" content="{{ product.meta_title or product.name }}">
 <meta property="og:type" content="product">
 {% if product.primary_image %}<meta property="og:image" content="{{ product.primary_image.image_url }}">{% endif %}
 <script type="application/ld+json">
@@ -14,7 +14,7 @@
   "@context": "https://schema.org",
   "@type": "Product",
   "name": {{ product.name | tojson }},
-  "description": {{ (product.short_description or product.description or product.name) | tojson }},
+  "description": {{ (product.meta_description or product.short_description or product.description or product.name) | tojson }},
   {% if product.sku %}"sku": {{ product.sku | tojson }},{% endif %}
   {% if product.primary_image %}"image": [{{ product.primary_image.image_url | tojson }}],{% endif %}
   {% if product.category %}"category": {{ product.category.name | tojson }},{% endif %}
@@ -32,6 +32,21 @@
     "reviewCount": {{ review_count | tojson }}
   }
   {%- endif %}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Shop", "item": {{ (request.url.scheme ~ "://" ~ request.url.netloc ~ "/shop") | tojson }}}
+    {%- if product.category -%}
+    ,{"@type": "ListItem", "position": 2, "name": {{ product.category.name | tojson }}, "item": {{ (request.url.scheme ~ "://" ~ request.url.netloc ~ "/category/" ~ product.category.slug) | tojson }}}
+    ,{"@type": "ListItem", "position": 3, "name": {{ product.name | tojson }}, "item": {{ (request.url.scheme ~ "://" ~ request.url.netloc ~ request.url.path) | tojson }}}
+    {%- else -%}
+    ,{"@type": "ListItem", "position": 2, "name": {{ product.name | tojson }}, "item": {{ (request.url.scheme ~ "://" ~ request.url.netloc ~ request.url.path) | tojson }}}
+    {%- endif %}
+  ]
 }
 </script>
 {% endblock %}
@@ -185,6 +200,20 @@
       </form>
       {% else %}
       <button class="btn btn-secondary btn-block" disabled style="margin:18px 0;">{{ t('out_of_stock', current_language) }}</button>
+
+      {% if notify_requested %}
+      <p class="badge badge--success" style="margin-bottom:18px;">🔔 We'll notify you when this is back in stock</p>
+      {% elif current_customer %}
+      <form method="post" action="/product/{{ product.slug }}/notify-me" class="card" style="padding:14px;margin-bottom:18px;">
+        <label for="notify_mobile" style="font-weight:600;font-size:0.9rem;">🔔 Notify me when back in stock</label>
+        <div class="flex gap-8" style="margin-top:8px;">
+          <input class="form-control" type="tel" id="notify_mobile" name="mobile" placeholder="Your mobile number" required style="flex:1;">
+          <button type="submit" class="btn btn-primary btn-sm">Notify Me</button>
+        </div>
+      </form>
+      {% else %}
+      <a href="/login?next=/product/{{ product.slug }}" class="btn btn-outline btn-block" style="margin-bottom:18px;">🔔 Log in to get notified when back in stock</a>
+      {% endif %}
       {% endif %}
 
       {% if product.description %}
@@ -218,7 +247,7 @@
     {% if current_customer %}
     <div class="card" style="max-width:480px; margin-bottom:20px;">
       <h3 style="font-size:0.95rem; margin-top:0;">{{ 'Edit Your Review' if my_review else 'Write a Review' }}</h3>
-      <form method="post" action="/product/{{ product.slug }}/review">
+      <form method="post" action="/product/{{ product.slug }}/review" enctype="multipart/form-data">
         <div class="form-group">
           <label for="rating">Rating *</label>
           <select class="form-control" id="rating" name="rating" required>
@@ -230,6 +259,11 @@
         <div class="form-group">
           <label for="review_text">Your Review (optional)</label>
           <textarea class="form-control" id="review_text" name="review_text" rows="3" maxlength="1000">{{ my_review.review_text if my_review else '' }}</textarea>
+        </div>
+        <div class="form-group">
+          <label for="photo">Add a Photo (optional)</label>
+          {% if my_review and my_review.photo_url %}<div class="thumb-preview" style="margin-bottom:8px;"><img src="{{ my_review.photo_url }}" alt=""></div>{% endif %}
+          <input type="file" id="photo" name="photo" accept="image/jpeg,image/png,image/webp">
         </div>
         <button type="submit" class="btn btn-primary">{{ 'Update Review' if my_review else 'Submit Review' }}</button>
         {% if my_review and not my_review.approved %}<p class="field-hint">Your review is awaiting approval.</p>{% endif %}
@@ -244,11 +278,15 @@
       {% for r in approved_reviews %}
       <div class="card">
         <div class="flex justify-between items-center">
-          <strong>{{ r.customer.name }}</strong>
+          <span class="flex items-center gap-8">
+            <strong>{{ r.customer.name }}</strong>
+            {% if r.is_verified %}<span class="badge badge--success" style="font-size:0.65rem;">✓ Verified Purchase</span>{% endif %}
+          </span>
           <span class="text-muted" style="font-size:0.78rem;">{{ r.created_at.strftime('%d %b %Y') }}</span>
         </div>
         <div style="color:var(--color-accent); margin:4px 0;">{{ stars_macro.stars(r.rating) }}</div>
         {% if r.review_text %}<p style="margin:0;">{{ r.review_text }}</p>{% endif %}
+        {% if r.photo_url %}<img src="{{ r.photo_url }}" alt="" style="width:88px;height:88px;object-fit:cover;border-radius:8px;margin-top:8px;">{% endif %}
       </div>
       {% endfor %}
     </div>
@@ -263,6 +301,8 @@
     </div>
   </section>
   {% endif %}
+
+  <div id="recently-viewed-row" hidden></div>
 </div>
 {% endblock %}
 

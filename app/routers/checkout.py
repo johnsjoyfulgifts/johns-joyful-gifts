@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.cart_service import cart_totals, clear_cart, get_cart_lines, read_cart
 from app.customer_auth import require_customer, require_customer_api
 from app.database import get_db
-from app.models import Coupon, Customer, GiftOption, Order, OrderGiftOption, OrderItem, OrderStatus, OrderStatusHistory, Product
+from app.models import AbandonedCartLead, Coupon, Customer, GiftOption, Order, OrderGiftOption, OrderItem, OrderStatus, OrderStatusHistory, Product
 from app.qr import generate_qr_png_bytes, upi_payment_uri
 from app.schemas import CheckoutRequest
 from app.settings_service import compute_delivery_charge, get_all_settings, get_setting, manual_payment_available
@@ -269,6 +269,8 @@ async def api_checkout(
         account.city = checkout_data.city
         account.state = checkout_data.state
         account.pincode = checkout_data.pincode
+
+        db.query(AbandonedCartLead).filter(AbandonedCartLead.customer_id == customer.id).delete()
 
         order_number = order.order_number
         db.commit()

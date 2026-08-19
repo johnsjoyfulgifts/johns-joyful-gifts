@@ -1,0 +1,32 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Abandoned Carts — Admin{% endblock %}
+{% block page_title %}Abandoned Carts{% endblock %}
+
+{% block admin_content %}
+<p class="text-muted" style="font-size:0.85rem;margin-top:-8px;">Logged-in customers with items sitting in their cart. No automated reminder emails exist — use the WhatsApp link to follow up manually. A cart drops off this list the moment that customer completes checkout.</p>
+
+{% if leads %}
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead><tr><th>Customer</th><th>Items</th><th>Subtotal</th><th>Last Updated</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for lead in leads %}
+      <tr>
+        <td>{{ lead.customer.name if lead.customer else '—' }}</td>
+        <td>{{ lead.item_count }}</td>
+        <td>₹{{ '%.2f'|format(lead.subtotal) }}</td>
+        <td class="text-muted">{{ lead.last_updated.strftime('%d %b %Y, %I:%M %p') }}</td>
+        <td>
+          {% if lead.customer and lead.customer.mobile %}
+          <a class="btn btn-sm btn-whatsapp" href="https://wa.me/{{ lead.customer.mobile|replace(' ', '')|replace('+', '') }}" target="_blank" rel="noopener">💬 Follow Up</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state"><h3>No abandoned carts right now.</h3><p>When a logged-in customer leaves items sitting in their cart, they'll show up here.</p></div>
+{% endif %}
+{% endblock %}

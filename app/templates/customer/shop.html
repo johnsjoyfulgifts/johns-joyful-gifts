@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "customer/_product_card.html" as cards with context %}
-{% block title %}{{ page_title }} — {{ store.store_name }}{% endblock %}
+{% block title %}{{ page_meta_title or page_title }} — {{ store.store_name }}{% endblock %}
+{% block meta_description %}{{ page_meta_description or (store.store_name ~ ": " ~ store.store_tagline ~ ". Shop toys, stationery, school bags, kids products and gifts online.") }}{% endblock %}
 
 {% block content %}
 <div class="container page-section">

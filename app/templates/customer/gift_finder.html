@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Gift Finder — {{ store.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container page-section" style="max-width:640px;">
+  <div class="text-center" style="margin-bottom:20px;">
+    <h1 class="section-title" style="margin-bottom:6px;">🎯 Gift Finder</h1>
+    <p class="text-muted">Answer a few quick questions and we'll point you to the right gifts.</p>
+  </div>
+
+  <div class="finder-progress" aria-hidden="true">
+    <span class="finder-progress__dot active" data-progress-dot="1"></span>
+    <span class="finder-progress__dot" data-progress-dot="2"></span>
+    <span class="finder-progress__dot" data-progress-dot="3"></span>
+    <span class="finder-progress__dot" data-progress-dot="4"></span>
+  </div>
+
+  <div class="card finder-card">
+    <div class="finder-step" data-finder-step="1">
+      <h2 style="font-size:1.1rem; margin-top:0;">Who are you buying for?</h2>
+      <div class="finder-options">
+        {% for opt in ['Child', 'Teen', 'Husband', 'Wife', 'Friend', 'Parent', 'Teacher', 'Church Member', 'Couple'] %}
+        <button type="button" class="finder-option" data-step="1" data-value="{{ opt }}">{{ opt }}</button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="finder-step" data-finder-step="2" hidden>
+      <h2 style="font-size:1.1rem; margin-top:0;">What's the occasion?</h2>
+      <div class="finder-options">
+        {% for occ in occasions %}
+        <button type="button" class="finder-option" data-step="2" data-value="{{ occ.slug }}">{{ occ.name }}</button>
+        {% endfor %}
+        <button type="button" class="finder-option" data-step="2" data-value="">Any / Not sure</button>
+      </div>
+      <button type="button" class="btn btn-outline btn-sm finder-back" data-back="1" style="margin-top:14px;">← Back</button>
+    </div>
+
+    <div class="finder-step" data-finder-step="3" hidden>
+      <h2 style="font-size:1.1rem; margin-top:0;">What's your budget?</h2>
+      <div class="finder-options">
+        <button type="button" class="finder-option" data-step="3" data-value="500">Under ₹500</button>
+        <button type="button" class="finder-option" data-step="3" data-value="1000">Under ₹1000</button>
+        <button type="button" class="finder-option" data-step="3" data-value="1500">Under ₹1500</button>
+        <button type="button" class="finder-option" data-step="3" data-value="2500plus">₹2500+</button>
+      </div>
+      <button type="button" class="btn btn-outline btn-sm finder-back" data-back="2" style="margin-top:14px;">← Back</button>
+    </div>
+
+    <div class="finder-step" data-finder-step="4" hidden>
+      <h2 style="font-size:1.1rem; margin-top:0;">Should it be personalized?</h2>
+      <p class="text-muted" style="margin-top:-8px; font-size:0.85rem;">Think custom name, photo, or message on the gift.</p>
+      <div class="finder-options">
+        <button type="button" class="finder-option" data-step="4" data-value="yes">🎁 Yes, personalize it</button>
+        <button type="button" class="finder-option" data-step="4" data-value="no">No preference</button>
+      </div>
+      <button type="button" class="btn btn-outline btn-sm finder-back" data-back="3" style="margin-top:14px;">← Back</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var answers = { 1: null, 2: null, 3: null, 4: null };
+  var totalSteps = 4;
+
+  function showStep(n) {
+    document.querySelectorAll('[data-finder-step]').forEach(function (el) {
+      el.hidden = el.getAttribute('data-finder-step') !== String(n);
+    });
+    document.querySelectorAll('[data-progress-dot]').forEach(function (dot) {
+      dot.classList.toggle('active', parseInt(dot.getAttribute('data-progress-dot'), 10) <= n);
+    });
+  }
+
+  function goToShop() {
+    var params = new URLSearchParams();
+    if (answers[2]) params.set('collection', answers[2]);
+    if (answers[3] === '2500plus') {
+      params.set('min_price', '2500');
+    } else if (answers[3]) {
+      params.set('max_price', answers[3]);
+    }
+    if (answers[4] === 'yes') params.set('personalizable', 'true');
+    window.location.href = '/shop?' + params.toString();
+  }
+
+  document.querySelectorAll('.finder-option').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var step = parseInt(btn.getAttribute('data-step'), 10);
+      answers[step] = btn.getAttribute('data-value');
+      if (step < totalSteps) {
+        showStep(step + 1);
+      } else {
+        goToShop();
+      }
+    });
+  });
+
+  document.querySelectorAll('.finder-back').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      showStep(parseInt(btn.getAttribute('data-back'), 10));
+    });
+  });
+})();
+</script>
+{% endblock %}

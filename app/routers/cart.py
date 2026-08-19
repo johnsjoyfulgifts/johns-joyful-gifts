@@ -13,7 +13,7 @@ from app.cart_service import (
 )
 from app.customer_auth import get_current_customer
 from app.database import get_db
-from app.models import Product
+from app.models import AbandonedCartLead, Product
 from app.settings_service import compute_delivery_charge, get_all_settings
 from app.storage import UploadValidationError, save_personalization_photo
 from app.templating import render
@@ -33,11 +33,39 @@ def cart_page(request: Request, db: Session = Depends(get_db)):
     subtotal, item_count = cart_totals(lines)
     delivery_charge = compute_delivery_charge(db, subtotal) if lines else 0.0
     total = round(subtotal + delivery_charge, 2)
+    current_customer = get_current_customer(request, db)
+
+    # Opportunistic capture for manual follow-up, since there's no background
+    # worker to detect abandonment on a timer: every time a logged-in
+    # customer views a non-empty cart, upsert a snapshot; an empty cart means
+    # they cleared it themselves, so drop any existing lead.
+    if current_customer is not None:
+        existing_lead = (
+            db.query(AbandonedCartLead).filter(AbandonedCartLead.customer_id == current_customer.id).first()
+        )
+        if lines:
+            summary = ", ".join(f"{line.product.name} x{line.quantity}" for line in lines)[:2000]
+            if existing_lead is None:
+                db.add(
+                    AbandonedCartLead(
+                        customer_id=current_customer.id,
+                        cart_summary=summary,
+                        item_count=item_count,
+                        subtotal=subtotal,
+                    )
+                )
+            else:
+                existing_lead.cart_summary = summary
+                existing_lead.item_count = item_count
+                existing_lead.subtotal = subtotal
+            db.commit()
+        elif existing_lead is not None:
+            db.delete(existing_lead)
+            db.commit()
 
     cart_whatsapp_link = None
     if lines:
         store_values = get_all_settings(db)
-        current_customer = get_current_customer(request, db)
         cart_whatsapp_link = whatsapp_chat_link(
             store_values.get("whatsapp_number", ""),
             cart_enquiry_message(
