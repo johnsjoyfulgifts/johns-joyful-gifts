@@ -1,0 +1,189 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Settings — Admin{% endblock %}
+{% block page_title %}Store Settings{% endblock %}
+
+{% block admin_content %}
+<div class="card" style="max-width:640px;">
+  <form method="post">
+    <h2 style="font-size:1rem; margin-top:0;">Store Info</h2>
+    <div class="form-group">
+      <label for="store_name">Store Name</label>
+      <input class="form-control" id="store_name" name="store_name" value="{{ values.store_name }}" required>
+    </div>
+    <div class="form-group">
+      <label for="store_tagline">Tagline</label>
+      <input class="form-control" id="store_tagline" name="store_tagline" value="{{ values.store_tagline }}">
+    </div>
+
+    <h2 style="font-size:1rem;">Contact &amp; Social</h2>
+    <div class="form-row form-row--2">
+      <div class="form-group">
+        <label for="whatsapp_number">WhatsApp Number (with country code)</label>
+        <input class="form-control" id="whatsapp_number" name="whatsapp_number" value="{{ values.whatsapp_number }}" placeholder="+919999999999" required>
+      </div>
+      <div class="form-group">
+        <label for="instagram_url">Instagram URL</label>
+        <input class="form-control" id="instagram_url" name="instagram_url" value="{{ values.instagram_url }}">
+      </div>
+    </div>
+    <div class="form-row form-row--2">
+      <div class="form-group">
+        <label for="contact_email">Contact Email (optional)</label>
+        <input class="form-control" id="contact_email" type="email" name="contact_email" value="{{ values.contact_email }}">
+      </div>
+      <div class="form-group">
+        <label for="contact_address">Contact Address (optional)</label>
+        <input class="form-control" id="contact_address" name="contact_address" value="{{ values.contact_address }}">
+      </div>
+    </div>
+
+    <h2 style="font-size:1rem;">Delivery Charges</h2>
+    <div class="form-group">
+      <label for="delivery_mode">Delivery Mode</label>
+      <select class="form-control" id="delivery_mode" name="delivery_mode">
+        <option value="flat" {{ 'selected' if values.delivery_mode == 'flat' }}>Flat charge (with optional free threshold)</option>
+        <option value="free" {{ 'selected' if values.delivery_mode == 'free' }}>Always free</option>
+        <option value="disabled" {{ 'selected' if values.delivery_mode == 'disabled' }}>Disabled (no delivery charge line)</option>
+      </select>
+    </div>
+    <div class="form-row form-row--2">
+      <div class="form-group">
+        <label for="flat_delivery_charge">Flat Delivery Charge (₹)</label>
+        <input class="form-control" id="flat_delivery_charge" type="number" step="0.01" min="0" name="flat_delivery_charge" value="{{ values.flat_delivery_charge }}">
+      </div>
+      <div class="form-group">
+        <label for="free_delivery_threshold">Free Delivery Above (₹)</label>
+        <input class="form-control" id="free_delivery_threshold" type="number" step="0.01" min="0" name="free_delivery_threshold" value="{{ values.free_delivery_threshold }}">
+        <p class="field-hint">Set to 0 to disable the free-delivery threshold.</p>
+      </div>
+    </div>
+
+    <h2 style="font-size:1rem;">Manual Payment (UPI / Bank Transfer)</h2>
+    <p class="field-hint" style="margin-top:-6px;">
+      Free — no gateway, no fees. Customers pay you directly; you confirm payment yourself and mark the order Paid.
+    </p>
+    <div class="form-group">
+      <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+        <input type="checkbox" name="manual_payment_enabled" value="true" {{ 'checked' if values.manual_payment_enabled == 'true' }}>
+        Offer "UPI / Bank Transfer" at checkout
+      </label>
+      <p class="field-hint">This is the only payment method (Cash on Delivery has been removed) — checkout is blocked until you turn this on and fill in a UPI ID or bank details below.</p>
+    </div>
+    <div class="form-group">
+      <label for="upi_id">Your UPI ID</label>
+      <input class="form-control" id="upi_id" name="upi_id" value="{{ values.upi_id }}" placeholder="yourshop@okhdfcbank">
+      <p class="field-hint">Customers get a scannable QR code generated from this automatically.</p>
+    </div>
+    <div class="form-row form-row--2">
+      <div class="form-group">
+        <label for="bank_account_name">Bank Account Name</label>
+        <input class="form-control" id="bank_account_name" name="bank_account_name" value="{{ values.bank_account_name }}">
+      </div>
+      <div class="form-group">
+        <label for="bank_account_number">Bank Account Number</label>
+        <input class="form-control" id="bank_account_number" name="bank_account_number" value="{{ values.bank_account_number }}">
+      </div>
+    </div>
+    <div class="form-row form-row--2">
+      <div class="form-group">
+        <label for="bank_ifsc">IFSC Code</label>
+        <input class="form-control" id="bank_ifsc" name="bank_ifsc" value="{{ values.bank_ifsc }}">
+      </div>
+      <div class="form-group">
+        <label for="bank_name">Bank Name</label>
+        <input class="form-control" id="bank_name" name="bank_name" value="{{ values.bank_name }}">
+      </div>
+    </div>
+
+    <h2 style="font-size:1rem;">Language</h2>
+    <div class="form-group">
+      <label for="site_language">Storefront Language</label>
+      <select class="form-control" id="site_language" name="site_language" style="max-width:280px;">
+        {% for code, label in languages.items() %}
+        <option value="{{ code }}" {{ 'selected' if values.site_language == code }} {{ 'disabled' if code != 'en' }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <p class="field-hint">The site is built to support more languages — only English is fully translated today.</p>
+    </div>
+
+    <h2 style="font-size:1rem;">Quotations &amp; Invoices</h2>
+    <p class="field-hint" style="margin-top:-6px;">Used on generated quotation/invoice PDFs and as the default GST rate for new documents.</p>
+    <div class="form-row form-row--2">
+      <div class="form-group">
+        <label for="gst_number">GSTIN (optional)</label>
+        <input class="form-control" id="gst_number" name="gst_number" value="{{ values.gst_number }}" placeholder="22AAAAA0000A1Z5">
+      </div>
+      <div class="form-group">
+        <label for="default_gst_rate">Default GST Rate (%)</label>
+        <input class="form-control" id="default_gst_rate" type="number" step="0.1" min="0" max="100" name="default_gst_rate" value="{{ values.default_gst_rate }}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="whatsapp_quotation_template">WhatsApp Quotation Message Template</label>
+      <textarea class="form-control" id="whatsapp_quotation_template" name="whatsapp_quotation_template" rows="4" placeholder="Hi [CUSTOMER_NAME], here is your quotation [QUOTATION_NUMBER] for a total of Rs. [TOTAL]. Valid until [VALID_UNTIL].">{{ values.whatsapp_quotation_template }}</textarea>
+      <p class="field-hint">Placeholders: <code>[CUSTOMER_NAME]</code> <code>[QUOTATION_NUMBER]</code> <code>[TOTAL]</code> <code>[VALID_UNTIL]</code>. Leave blank to use the default wording.</p>
+    </div>
+
+    <h2 style="font-size:1rem;">Announcement Banner</h2>
+    <p class="field-hint" style="margin-top:-6px;">A strip shown at the top of every page — good for festival sales or "free delivery this week" notices.</p>
+    <div class="form-group">
+      <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+        <input type="checkbox" name="announcement_enabled" value="true" {{ 'checked' if values.announcement_enabled == 'true' }}>
+        Show announcement banner
+      </label>
+    </div>
+    <div class="form-group">
+      <label for="announcement_text">Announcement Text</label>
+      <input class="form-control" id="announcement_text" name="announcement_text" maxlength="200" value="{{ values.announcement_text }}" placeholder="🎉 Diwali Sale — Free delivery on orders above ₹999!">
+    </div>
+
+    <h2 style="font-size:1rem;">WhatsApp Message Templates</h2>
+    <p class="field-hint" style="margin-top:-6px;">
+      Controls the text that's pre-filled when a customer taps a WhatsApp enquiry button. They can still edit it before sending.
+      Placeholders: <code>[PRODUCT_NAME]</code> <code>[SKU]</code> <code>[PRICE]</code> <code>[QUANTITY]</code> <code>[CART_TOTAL]</code> <code>[CUSTOMER_NAME]</code> <code>[PRODUCT_LINK]</code> (cart template also supports <code>[CART_ITEMS]</code>). Leave blank to use the default wording.
+    </p>
+    <div class="form-group">
+      <label for="whatsapp_product_template">Single Product Enquiry Template</label>
+      <textarea class="form-control" id="whatsapp_product_template" name="whatsapp_product_template" rows="4" placeholder="{{ default_product_template }}">{{ values.whatsapp_product_template }}</textarea>
+    </div>
+    <div class="form-group">
+      <label for="whatsapp_cart_template">Cart Enquiry Template</label>
+      <textarea class="form-control" id="whatsapp_cart_template" name="whatsapp_cart_template" rows="4" placeholder="{{ default_cart_template }}">{{ values.whatsapp_cart_template }}</textarea>
+    </div>
+
+    <h2 style="font-size:1rem;">Stock Alerts</h2>
+    <div class="form-group">
+      <label for="low_stock_threshold">Low Stock Threshold</label>
+      <input class="form-control" id="low_stock_threshold" type="number" step="1" min="0" name="low_stock_threshold" value="{{ values.low_stock_threshold }}" style="max-width:120px;">
+      <p class="field-hint">Products at or below this stock count are flagged as "Low Stock" everywhere in the shop and admin.</p>
+    </div>
+
+    <h2 style="font-size:1rem;">About Page</h2>
+    <div class="form-group">
+      <label for="about_text">About Us Text</label>
+      <textarea class="form-control" id="about_text" name="about_text" rows="4">{{ values.about_text }}</textarea>
+    </div>
+
+    <h2 style="font-size:1rem;">Legal Pages</h2>
+    <p class="field-hint" style="margin-top:-6px;">Shown at <code>/privacy-policy</code>, <code>/terms</code>, <code>/shipping-policy</code> and <code>/refund-policy</code>, and linked from the site footer. Plain text — blank lines become paragraph breaks.</p>
+    <div class="form-group">
+      <label for="privacy_policy_text">Privacy Policy</label>
+      <textarea class="form-control" id="privacy_policy_text" name="privacy_policy_text" rows="6">{{ values.privacy_policy_text }}</textarea>
+    </div>
+    <div class="form-group">
+      <label for="terms_text">Terms &amp; Conditions</label>
+      <textarea class="form-control" id="terms_text" name="terms_text" rows="6">{{ values.terms_text }}</textarea>
+    </div>
+    <div class="form-group">
+      <label for="shipping_policy_text">Shipping Policy</label>
+      <textarea class="form-control" id="shipping_policy_text" name="shipping_policy_text" rows="6">{{ values.shipping_policy_text }}</textarea>
+    </div>
+    <div class="form-group">
+      <label for="refund_policy_text">Cancellation / Refund Policy</label>
+      <textarea class="form-control" id="refund_policy_text" name="refund_policy_text" rows="6">{{ values.refund_policy_text }}</textarea>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save Settings</button>
+  </form>
+</div>
+{% endblock %}

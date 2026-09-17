@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Track Your Order — {{ store.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container page-section" style="max-width:600px;">
+  <h1 class="section-title">Track Your Order</h1>
+
+  <div class="card">
+    <form id="track-form">
+      <div class="form-group">
+        <label for="order_number">Order ID *</label>
+        <input class="form-control" id="order_number" name="order_number" placeholder="JJG-20260812-0001" value="{{ prefill_order_number }}" required>
+      </div>
+      <div class="form-group">
+        <label for="mobile">Mobile Number Used at Checkout *</label>
+        <input class="form-control" id="mobile" name="mobile" inputmode="tel" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="track-btn">Track Order</button>
+    </form>
+    <div id="track-alert" style="margin-top:14px;"></div>
+  </div>
+
+  <div id="track-result" style="margin-top:20px;"></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var STATUS_SEQUENCE = ["Order Placed", "Order Confirmed", "Processing", "Packed", "Shipped", "Out for Delivery", "Delivered"];
+  var form = document.getElementById('track-form');
+  var alertBox = document.getElementById('track-alert');
+  var resultBox = document.getElementById('track-result');
+  var btn = document.getElementById('track-btn');
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str == null ? '' : String(str);
+    return div.innerHTML;
+  }
+
+  function renderResult(data) {
+    var isCancelled = data.order_status === 'Cancelled';
+    var reachedIndex = STATUS_SEQUENCE.indexOf(data.order_status);
+
+    var timelineHtml = '<ul class="timeline">';
+    if (isCancelled) {
+      timelineHtml += '<li class="done"><div class="t-status">Cancelled</div></li>';
+    } else {
+      STATUS_SEQUENCE.forEach(function (status, idx) {
+        var done = reachedIndex >= 0 && idx <= reachedIndex;
+        timelineHtml += '<li class="' + (done ? 'done' : '') + '"><div class="t-status">' + escapeHtml(status) + '</div></li>';
+      });
+    }
+    timelineHtml += '</ul>';
+
+    var itemsHtml = data.items.map(function (item) {
+      return '<div class="cart-summary-row"><span>' + escapeHtml(item.name) + ' × ' + item.quantity + '</span><span>₹' + item.subtotal.toFixed(0) + '</span></div>';
+    }).join('');
+
+    var courierHtml = '';
+    if (data.courier_name || data.tracking_id) {
+      courierHtml = '<div class="card" style="margin-top:16px;">' +
+        '<h2 style="font-size:1rem;margin-top:0;">Courier Details</h2>' +
+        (data.courier_name ? '<p>Courier: <strong>' + escapeHtml(data.courier_name) + '</strong></p>' : '') +
+        (data.tracking_id ? '<p>Tracking ID: <strong>' + escapeHtml(data.tracking_id) + '</strong></p>' : '') +
+        (data.estimated_delivery ? '<p>Estimated Delivery: <strong>' + escapeHtml(data.estimated_delivery) + '</strong></p>' : '') +
+        (data.tracking_url ? '<a class="btn btn-outline" href="' + escapeHtml(data.tracking_url) + '" target="_blank" rel="noopener">Track Shipment</a>' : '') +
+        '</div>';
+    }
+
+    resultBox.innerHTML =
+      '<div class="card">' +
+      '<div class="flex justify-between items-center"><h2 style="margin:0;font-size:1.1rem;">' + escapeHtml(data.order_number) + '</h2>' +
+      '<span class="badge ' + (isCancelled ? 'badge--danger' : 'badge--success') + '">' + escapeHtml(data.order_status) + '</span></div>' +
+      '<p class="text-muted" style="font-size:0.8rem;">Placed on ' + new Date(data.created_at).toLocaleDateString() + '</p>' +
+      timelineHtml +
+      '<hr style="border:none;border-top:1px solid var(--color-border);margin:14px 0;">' +
+      itemsHtml +
+      '<div class="cart-summary-row cart-summary-row--total"><span>Total</span><span>₹' + data.total.toFixed(0) + '</span></div>' +
+      '</div>' + courierHtml;
+  }
+
+  form.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    btn.disabled = true;
+    alertBox.innerHTML = '';
+    resultBox.innerHTML = '';
+
+    var payload = {
+      order_number: document.getElementById('order_number').value.trim(),
+      mobile: document.getElementById('mobile').value.trim(),
+    };
+
+    try {
+      var res = await fetch('/api/track-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      var data = await res.json();
+      if (!res.ok) {
+        alertBox.innerHTML = '<div class="alert alert--error">' + escapeHtml(data.detail) + '</div>';
+      } else {
+        renderResult(data);
+      }
+    } catch (err) {
+      alertBox.innerHTML = '<div class="alert alert--error">Your internet connection seems to be unavailable. Please check your connection and try again.</div>';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
+{% endblock %}

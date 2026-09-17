@@ -1,0 +1,42 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{{ 'Edit' if admin_user else 'Add' }} Admin — Admin{% endblock %}
+{% block page_title %}{{ 'Edit' if admin_user else 'Add' }} Admin{% endblock %}
+
+{% block admin_content %}
+<div class="card" style="max-width:480px;">
+  {% if error %}<div class="alert alert--error">{{ error }}</div>{% endif %}
+  <form method="post">
+    <div class="form-group">
+      <label for="name">Name *</label>
+      <input class="form-control" id="name" name="name" value="{{ admin_user.name if admin_user else '' }}" required>
+    </div>
+    {% if not admin_user %}
+    <div class="form-group">
+      <label for="email">Email (used to log in) *</label>
+      <input class="form-control" id="email" type="email" name="email" required>
+    </div>
+    <div class="form-group">
+      <label for="password">Password (min 8 characters) *</label>
+      <input class="form-control" id="password" type="password" name="password" minlength="8" required>
+    </div>
+    {% else %}
+    <div class="form-group">
+      <label>Email</label>
+      <p class="text-muted" style="margin:0;">{{ admin_user.email }}</p>
+    </div>
+    {% endif %}
+    <div class="form-group">
+      <label for="role">Role</label>
+      <select class="form-control" id="role" name="role">
+        {% for r in roles %}
+        <option value="{{ r }}" {{ 'selected' if (admin_user and admin_user.role == r) or (not admin_user and r == 'product_manager') }}>{{ role_labels[r] }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="flex gap-8">
+      <button type="submit" class="btn btn-primary">Save Admin</button>
+      <a class="btn btn-secondary" href="/admin/admins">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Invoices — Admin{% endblock %}
+{% block page_title %}Invoices{% endblock %}
+
+{% block admin_content %}
+<div class="flex justify-between items-center" style="margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+  <span class="text-muted">{{ invoices|length }} invoices</span>
+  <a class="btn btn-primary btn-sm" href="/admin/invoices/new">+ New Invoice</a>
+</div>
+
+<form class="filter-bar" method="get">
+  <select name="status" onchange="this.form.submit()">
+    <option value="" {{ 'selected' if not status }}>All Status</option>
+    {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if status == s }}>{{ s }}</option>{% endfor %}
+  </select>
+</form>
+
+{% if invoices %}
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead><tr><th>Number</th><th>Customer</th><th>Date</th><th>Total</th><th>Paid</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for inv in invoices %}
+      <tr>
+        <td><a href="/admin/invoices/{{ inv.id }}">{{ inv.invoice_number }}</a></td>
+        <td>{{ inv.customer_name }}</td>
+        <td class="text-muted">{{ inv.created_at.strftime('%d %b %Y') }}</td>
+        <td>₹{{ "%.2f"|format(inv.total) }}</td>
+        <td>₹{{ "%.2f"|format(inv.amount_paid) }}</td>
+        <td>
+          {% if inv.payment_status == 'Paid' %}<span class="badge badge--success">{{ inv.payment_status }}</span>
+          {% elif inv.payment_status == 'Cancelled' %}<span class="badge badge--danger">{{ inv.payment_status }}</span>
+          {% elif inv.payment_status == 'Partially Paid' %}<span class="badge badge--warning">{{ inv.payment_status }}</span>
+          {% else %}<span class="badge badge--muted">{{ inv.payment_status }}</span>{% endif %}
+        </td>
+        <td>
+          <a class="btn btn-sm btn-secondary" href="/admin/invoices/{{ inv.id }}">View</a>
+          <a class="btn btn-sm btn-secondary" href="/admin/invoices/{{ inv.id }}/edit">Edit</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state"><h3>No invoices yet.</h3><p>Create one directly, or convert an accepted quotation.</p></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,31 @@
+# fly.toml app configuration file generated for johns-joyful-gifts on 2026-08-13T11:07:46+05:30
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'johns-joyful-gifts'
+primary_region = 'iad'
+
+[build]
+
+[env]
+  ENVIRONMENT = 'production'
+  DATABASE_URL = 'sqlite:////data/johns_joyful_gifts.db'
+  UPLOAD_DIR = '/data/uploads'
+
+[mounts]
+  source = 'data'
+  destination = '/data'
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 256

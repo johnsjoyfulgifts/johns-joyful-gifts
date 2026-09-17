@@ -1,0 +1,54 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Gift Combos — Admin{% endblock %}
+{% block page_title %}Gift Combos{% endblock %}
+
+{% block admin_content %}
+<div class="flex justify-between items-center" style="margin-bottom:14px;">
+  <span class="text-muted">{{ bundles|length }} combos</span>
+  <a class="btn btn-primary btn-sm" href="/admin/bundles/new">+ Add Combo</a>
+</div>
+<p class="text-muted" style="font-size:0.85rem; margin-top:-8px;">Bundle 2 or more products together as a "Gift Combo" with an optional combo price shown as a savings badge. Customers add each product to the cart at its own real price — the combo price is informational only.</p>
+
+{% if bundles %}
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead><tr><th>Name</th><th>Products</th><th>Combo Price</th><th>Savings</th><th>Order</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for b in bundles %}
+      <tr>
+        <td>{{ b.name }}</td>
+        <td>{{ b.items|length }}</td>
+        <td>{% if b.bundle_price %}₹{{ '%.2f'|format(b.bundle_price) }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+        <td>{% if b.savings %}<span class="badge badge--success">Save ₹{{ '%.2f'|format(b.savings) }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+        <td>{{ b.sort_order }}</td>
+        <td>{% if b.active %}<span class="badge badge--success">Active</span>{% else %}<span class="badge badge--muted">Inactive</span>{% endif %}</td>
+        <td>
+          <a class="btn btn-sm btn-secondary" href="/admin/bundles/{{ b.id }}/edit">Edit</a>
+          <form method="post" action="/admin/bundles/{{ b.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this gift combo? Products themselves are untouched.');">
+            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div class="admin-card-list">
+  {% for b in bundles %}
+  <div class="admin-record-card">
+    <div class="admin-record-card__row"><span>Name</span><span>{{ b.name }}</span></div>
+    <div class="admin-record-card__row"><span>Products</span><span>{{ b.items|length }}</span></div>
+    <div class="admin-record-card__row"><span>Status</span><span>{% if b.active %}<span class="badge badge--success">Active</span>{% else %}<span class="badge badge--muted">Inactive</span>{% endif %}</span></div>
+    <div class="flex gap-8" style="margin-top:10px;">
+      <a class="btn btn-sm btn-secondary" href="/admin/bundles/{{ b.id }}/edit">Edit</a>
+      <form method="post" action="/admin/bundles/{{ b.id }}/delete" onsubmit="return confirm('Delete this gift combo?');">
+        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state"><h3>No gift combos yet.</h3><p>Bundle popular products together — like a "Birthday Return Gift Combo" — to boost average order value.</p></div>
+{% endif %}
+{% endblock %}

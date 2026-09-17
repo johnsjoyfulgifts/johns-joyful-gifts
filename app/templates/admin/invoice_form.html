@@ -1,0 +1,172 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}{{ 'Edit' if doc else 'New' }} Invoice — Admin{% endblock %}
+{% block page_title %}{{ 'Edit' if doc else 'New' }} Invoice{% endblock %}
+
+{% block admin_content %}
+<div class="card" style="max-width:900px;">
+  {% if error %}<div class="alert alert--error">{{ error }}</div>{% endif %}
+  <form method="post" id="doc-form">
+    <h2 style="font-size:1rem; margin-top:0;">Customer</h2>
+    <div class="form-row form-row--2">
+      <div class="form-group">
+        <label for="customer_name">Customer Name *</label>
+        <input class="form-control" id="customer_name" name="customer_name" value="{{ doc.customer_name if doc else '' }}" required>
+      </div>
+      <div class="form-group">
+        <label for="customer_phone">Phone *</label>
+        <input class="form-control" id="customer_phone" name="customer_phone" value="{{ doc.customer_phone if doc else '' }}" placeholder="+919999999999" required>
+      </div>
+    </div>
+    <div class="form-row form-row--2">
+      <div class="form-group">
+        <label for="customer_email">Email (optional)</label>
+        <input class="form-control" id="customer_email" type="email" name="customer_email" value="{{ doc.customer_email if doc and doc.customer_email else '' }}">
+      </div>
+      <div class="form-group">
+        <label for="customer_address">Address (optional)</label>
+        <input class="form-control" id="customer_address" name="customer_address" value="{{ doc.customer_address if doc and doc.customer_address else '' }}">
+      </div>
+    </div>
+
+    <h2 style="font-size:1rem;">Line Items</h2>
+    <div class="admin-table-wrap">
+      <table class="admin-table" id="items-table">
+        <thead><tr><th>Product</th><th>Item Name</th><th>SKU</th><th>Qty</th><th>Unit Price</th><th>Discount %</th><th></th></tr></thead>
+        <tbody id="items-body">
+          {% if doc %}
+            {% for item in doc.items %}
+            <tr class="item-row">
+              <td>
+                <select class="form-control js-product-select">
+                  <option value="">— custom item —</option>
+                  {% for p in products %}<option value="{{ p.id }}" data-name="{{ p.name }}" data-sku="{{ p.sku or '' }}" data-price="{{ p.price }}" {{ 'selected' if item.product_id == p.id }}>{{ p.name }}</option>{% endfor %}
+                </select>
+              </td>
+              <td><input class="form-control js-item-name" name="item_name" value="{{ item.product_name_snapshot }}" required></td>
+              <td><input class="form-control js-item-sku" name="item_sku" value="{{ item.sku_snapshot or '' }}"></td>
+              <td><input class="form-control js-item-qty" type="number" min="1" name="item_qty" value="{{ item.quantity }}" style="width:70px;"></td>
+              <td><input class="form-control js-item-price" type="number" step="0.01" min="0" name="item_price" value="{{ item.unit_price }}" style="width:100px;"></td>
+              <td><input class="form-control js-item-discount" type="number" step="0.1" min="0" max="100" name="item_discount" value="{{ item.discount_percent }}" style="width:80px;"></td>
+              <td><input type="hidden" class="js-item-product-id" name="item_product_id" value="{{ item.product_id or '' }}"><button type="button" class="btn btn-sm btn-danger js-remove-row">✕</button></td>
+            </tr>
+            {% endfor %}
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+    <button type="button" class="btn btn-sm btn-secondary" id="add-item-btn" style="margin-top:8px;">+ Add Item</button>
+
+    <template id="item-row-template">
+      <tr class="item-row">
+        <td>
+          <select class="form-control js-product-select">
+            <option value="">— custom item —</option>
+            {% for p in products %}<option value="{{ p.id }}" data-name="{{ p.name }}" data-sku="{{ p.sku or '' }}" data-price="{{ p.price }}">{{ p.name }}</option>{% endfor %}
+          </select>
+        </td>
+        <td><input class="form-control js-item-name" name="item_name" required></td>
+        <td><input class="form-control js-item-sku" name="item_sku"></td>
+        <td><input class="form-control js-item-qty" type="number" min="1" name="item_qty" value="1" style="width:70px;"></td>
+        <td><input class="form-control js-item-price" type="number" step="0.01" min="0" name="item_price" style="width:100px;"></td>
+        <td><input class="form-control js-item-discount" type="number" step="0.1" min="0" max="100" name="item_discount" value="0" style="width:80px;"></td>
+        <td><input type="hidden" class="js-item-product-id" name="item_product_id"><button type="button" class="btn btn-sm btn-danger js-remove-row">✕</button></td>
+      </tr>
+    </template>
+
+    {% if gift_options %}
+    <h2 style="font-size:1rem;">Gift Extras (optional)</h2>
+    <div class="flex gap-8" style="flex-wrap:wrap; margin-bottom:12px;">
+      {% set assigned_gift_ids = doc.gift_options|map(attribute='name_snapshot')|list if doc else [] %}
+      {% for g in gift_options %}
+      <label style="display:flex; align-items:center; gap:6px; font-weight:400; font-size:0.85rem; border:1px solid var(--color-border); border-radius:6px; padding:5px 10px;">
+        <input type="checkbox" name="gift_option_ids" value="{{ g.id }}" {{ 'checked' if g.name in assigned_gift_ids }}>
+        {{ g.name }} — ₹{{ "%.0f"|format(g.price) }}
+      </label>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <h2 style="font-size:1rem;">Charges &amp; Tax</h2>
+    <div class="form-row form-row--3">
+      <div class="form-group">
+        <label for="discount_amount">Overall Discount (₹)</label>
+        <input class="form-control" id="discount_amount" type="number" step="0.01" min="0" name="discount_amount" value="{{ doc.discount_amount if doc else 0 }}">
+      </div>
+      <div class="form-group">
+        <label for="additional_charges">Additional Charges (₹)</label>
+        <input class="form-control" id="additional_charges" type="number" step="0.01" min="0" name="additional_charges" value="{{ doc.additional_charges if doc else 0 }}">
+      </div>
+      <div class="form-group">
+        <label for="additional_charges_note">Charges Note</label>
+        <input class="form-control" id="additional_charges_note" name="additional_charges_note" value="{{ doc.additional_charges_note if doc and doc.additional_charges_note else '' }}" placeholder="Packing, delivery...">
+      </div>
+    </div>
+    <div class="form-row form-row--2">
+      <div class="form-group">
+        <label for="gst_rate">GST Rate (%)</label>
+        <input class="form-control" id="gst_rate" type="number" step="0.1" min="0" max="100" name="gst_rate" value="{{ doc.gst_rate if doc else default_gst_rate }}">
+      </div>
+      <div class="form-group">
+        <label style="display:flex; align-items:center; gap:8px; font-weight:400; margin-top:26px;">
+          <input type="checkbox" name="is_interstate" value="true" {{ 'checked' if doc and doc.is_interstate }}>
+          Inter-state sale (IGST instead of CGST+SGST)
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="notes">Notes (optional)</label>
+      <textarea class="form-control" id="notes" name="notes" rows="2">{{ doc.notes if doc and doc.notes else '' }}</textarea>
+    </div>
+
+    <div class="flex gap-8">
+      <button type="submit" class="btn btn-primary">Save Invoice</button>
+      <a class="btn btn-secondary" href="/admin/invoices">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+(function () {
+  var body = document.getElementById('items-body');
+  var template = document.getElementById('item-row-template');
+  var addBtn = document.getElementById('add-item-btn');
+
+  function wireRow(row) {
+    var select = row.querySelector('.js-product-select');
+    var nameInput = row.querySelector('.js-item-name');
+    var skuInput = row.querySelector('.js-item-sku');
+    var priceInput = row.querySelector('.js-item-price');
+    var productIdInput = row.querySelector('.js-item-product-id');
+    var removeBtn = row.querySelector('.js-remove-row');
+
+    select.addEventListener('change', function () {
+      var opt = select.options[select.selectedIndex];
+      productIdInput.value = select.value;
+      if (select.value) {
+        nameInput.value = opt.getAttribute('data-name') || '';
+        skuInput.value = opt.getAttribute('data-sku') || '';
+        priceInput.value = opt.getAttribute('data-price') || '';
+      }
+    });
+    removeBtn.addEventListener('click', function () {
+      if (body.querySelectorAll('.item-row').length > 1) row.remove();
+    });
+  }
+
+  Array.from(body.querySelectorAll('.item-row')).forEach(wireRow);
+
+  if (body.querySelectorAll('.item-row').length === 0) {
+    var first = template.content.cloneNode(true).querySelector('.item-row');
+    body.appendChild(first);
+    wireRow(first);
+  }
+
+  addBtn.addEventListener('click', function () {
+    var row = template.content.cloneNode(true).querySelector('.item-row');
+    body.appendChild(row);
+    wireRow(row);
+  });
+})();
+</script>
+{% endblock %}

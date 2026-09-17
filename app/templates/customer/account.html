@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}My Account — {{ store.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container page-section">
+  <div class="flex justify-between items-center" style="margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+    <div class="flex items-center gap-12">
+      <div class="account-avatar">
+        {% if customer.profile_picture_url %}<img src="{{ customer.profile_picture_url }}" alt="">{% else %}<span>👤</span>{% endif %}
+      </div>
+      <div>
+        <h1 class="section-title mb-0">My Account</h1>
+        <p class="text-muted" style="margin:2px 0 0;">{{ customer.name }} · {{ customer.mobile }}</p>
+      </div>
+    </div>
+    <div class="flex gap-8">
+      <a class="btn btn-outline btn-sm" href="/account/change-password">Change Password</a>
+      <a class="btn btn-secondary btn-sm" href="/logout">Log Out</a>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <h2 style="font-size:1rem; margin-top:0;">Profile Picture</h2>
+    {% if profile_picture_error %}<p class="alert alert--error">{{ profile_picture_error }}</p>{% endif %}
+    <div class="flex items-center gap-12" style="flex-wrap:wrap;">
+      <div class="account-avatar account-avatar--lg">
+        {% if customer.profile_picture_url %}<img src="{{ customer.profile_picture_url }}" alt="">{% else %}<span>👤</span>{% endif %}
+      </div>
+      <form method="post" action="/account/profile-picture" enctype="multipart/form-data" class="flex items-center gap-8" style="flex-wrap:wrap;">
+        <input type="file" name="profile_picture" accept="image/jpeg,image/png,image/webp" required>
+        <button type="submit" class="btn btn-sm btn-primary">{{ 'Change Photo' if customer.profile_picture_url else 'Upload Photo' }}</button>
+      </form>
+      {% if customer.profile_picture_url %}
+      <form method="post" action="/account/profile-picture/remove">
+        <button type="submit" class="btn btn-sm btn-outline">Remove</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <h2 style="font-size:1.05rem;">Order History</h2>
+  {% if orders %}
+  <div style="display:flex; flex-direction:column; gap:12px;">
+    {% for order in orders %}
+    <div class="card">
+      <div class="flex justify-between items-center" style="flex-wrap:wrap; gap:8px;">
+        <div>
+          <strong>{{ order.order_number }}</strong>
+          <span class="text-muted" style="font-size:0.8rem; margin-left:8px;">{{ order.created_at.strftime('%d %b %Y') }}</span>
+        </div>
+        <span class="badge {{ 'badge--danger' if order.order_status == 'Cancelled' else 'badge--info' }}">{{ order.order_status }}</span>
+      </div>
+      <div style="margin-top:8px;">
+        {% for item in order.items %}
+        <div class="cart-summary-row"><span>{{ item.product_name_snapshot }} × {{ item.quantity }}</span><span>₹{{ "%.0f"|format(item.subtotal) }}</span></div>
+        {% endfor %}
+        <div class="cart-summary-row cart-summary-row--total"><span>Total</span><span>₹{{ "%.0f"|format(order.total) }}</span></div>
+      </div>
+      <div class="flex gap-8" style="margin-top:10px;">
+        <a class="btn btn-sm btn-secondary" href="/order/{{ order.order_number }}/success">View Details</a>
+        <a class="btn btn-sm btn-outline" href="/track-order?order_number={{ order.order_number }}">Track</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state__icon">📦</div>
+    <h3>No orders yet.</h3>
+    <p>When you place an order, it'll show up here.</p>
+    <a class="btn btn-primary" href="/shop" style="margin-top:12px;">Start Shopping</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

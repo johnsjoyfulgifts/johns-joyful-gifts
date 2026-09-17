@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% import "customer/_product_card.html" as cards with context %}
+{% block title %}{{ page_meta_title or page_title }} — {{ store.store_name }}{% endblock %}
+{% block meta_description %}{{ page_meta_description or (store.store_name ~ ": " ~ store.store_tagline ~ ". Shop toys, stationery, school bags, kids products and gifts online.") }}{% endblock %}
+
+{% block content %}
+<div class="container page-section">
+  <div class="shop-header">
+    <div>
+      <h1 class="section-title">{{ page_title }}</h1>
+      {% if page_description %}<p class="text-muted" style="margin-top:-10px;">{{ page_description }}</p>{% endif %}
+    </div>
+    <span class="results-count"><strong>{{ total }}</strong> product{{ 's' if total != 1 }}</span>
+  </div>
+
+  <form class="filter-bar filter-bar--shop" method="get" action="/shop">
+    <div class="filter-search">
+      <input type="text" name="q" placeholder="Search products..." value="{{ filters.q }}">
+    </div>
+    <select name="category">
+      <option value="">All Categories</option>
+      {% for cat in categories %}<option value="{{ cat.slug }}" {{ 'selected' if filters.category == cat.slug }}>{{ cat.name }}</option>{% endfor %}
+    </select>
+    <div class="price-range">
+      <input type="number" name="min_price" placeholder="Min ₹" min="0" value="{{ filters.min_price if filters.min_price is not none else '' }}">
+      <span>–</span>
+      <input type="number" name="max_price" placeholder="Max ₹" min="0" value="{{ filters.max_price if filters.max_price is not none else '' }}">
+    </div>
+    <select name="sort">
+      <option value="" {{ 'selected' if not filters.sort }}>Sort: Featured</option>
+      <option value="newest" {{ 'selected' if filters.sort == 'newest' }}>Newest</option>
+      <option value="price_asc" {{ 'selected' if filters.sort == 'price_asc' }}>Price: Low to High</option>
+      <option value="price_desc" {{ 'selected' if filters.sort == 'price_desc' }}>Price: High to Low</option>
+    </select>
+    <label class="checkbox-pill">
+      <input type="checkbox" name="in_stock" value="true" {{ 'checked' if filters.in_stock }}>
+      In stock only
+    </label>
+    <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+    {% if has_active_filters %}<a href="/shop" class="btn btn-sm btn-secondary">Clear Filters</a>{% endif %}
+  </form>
+
+  {% if products %}
+  <div class="product-grid">
+    {% for p in products %}{{ cards.product_card(p) }}{% endfor %}
+  </div>
+
+  {% if total_pages > 1 %}
+  <div class="flex gap-8 justify-between" style="margin-top:24px;">
+    {% if page > 1 %}
+      <a class="btn btn-secondary btn-sm" href="?{{ request.url.include_query_params(page=page-1).query }}">← Previous</a>
+    {% else %}
+      <span></span>
+    {% endif %}
+    <span class="text-muted" style="align-self:center;">Page {{ page }} of {{ total_pages }}</span>
+    {% if page < total_pages %}
+      <a class="btn btn-secondary btn-sm" href="?{{ request.url.include_query_params(page=page+1).query }}">Next →</a>
+    {% else %}
+      <span></span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state__icon">🔍</div>
+    <h3>No products available right now.</h3>
+    <p>Try a different search or filter, or check back soon.</p>
+    {% if has_active_filters %}<a class="btn btn-primary" href="/shop" style="margin-top:12px;">Clear Filters</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

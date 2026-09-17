@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Admin — {{ store.store_name }}{% endblock %}</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="/static/icons/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="admin-body">
+  <div class="admin-shell">
+    <aside class="admin-sidebar" id="admin-sidebar">
+      <div class="admin-sidebar__brand">
+        <img src="/static/icons/logo-icon.png" alt="" width="24" height="24" style="border-radius:50%; vertical-align:middle; margin-right:6px;">
+        {{ store.store_name }}
+      </div>
+      {% set role = current_admin.role if current_admin else '' %}
+      {% set is_super = role == 'super_admin' %}
+      {% set is_product = is_super or role == 'product_manager' %}
+      {% set is_order = is_super or role == 'order_enquiry_manager' %}
+      <nav aria-label="Admin navigation">
+        <div class="admin-sidebar__group-label">Overview</div>
+        <a href="/admin" class="{{ 'active' if active_nav == 'dashboard' else '' }}">📊 Dashboard</a>
+        <a href="/admin/analytics" class="{{ 'active' if active_nav == 'analytics' else '' }}">📈 Analytics</a>
+
+        {% if is_product %}
+        <div class="admin-sidebar__group-label">Products</div>
+        <a href="/admin/products" class="{{ 'active' if active_nav == 'products' else '' }}">🧸 Products</a>
+        <a href="/admin/categories" class="{{ 'active' if active_nav == 'categories' else '' }}">🗂️ Categories</a>
+        <a href="/admin/collections" class="{{ 'active' if active_nav == 'collections' else '' }}">🎉 Occasions & Ages</a>
+        <a href="/admin/bundles" class="{{ 'active' if active_nav == 'bundles' else '' }}">🎀 Gift Combos</a>
+        <a href="/admin/gift-options" class="{{ 'active' if active_nav == 'gift-options' else '' }}">🎁 Gift Options</a>
+        <a href="/admin/reviews" class="{{ 'active' if active_nav == 'reviews' else '' }}">⭐ Reviews</a>
+        <a href="/admin/notify-requests" class="{{ 'active' if active_nav == 'notify-requests' else '' }}">🔔 Notify Requests</a>
+        <a href="/admin/abandoned-carts" class="{{ 'active' if active_nav == 'abandoned-carts' else '' }}">🛒 Abandoned Carts</a>
+        {% endif %}
+
+        {% if is_order %}
+        <div class="admin-sidebar__group-label">Sales</div>
+        <a href="/admin/orders" class="{{ 'active' if active_nav == 'orders' else '' }}">📦 Orders <span id="new-order-badge"></span></a>
+        <a href="/admin/enquiries" class="{{ 'active' if active_nav == 'enquiries' else '' }}">💬 Enquiries</a>
+        <a href="/admin/quotations" class="{{ 'active' if active_nav == 'quotations' else '' }}">📋 Quotations</a>
+        <a href="/admin/invoices" class="{{ 'active' if active_nav == 'invoices' else '' }}">🧾 Invoices</a>
+        <a href="/admin/coupons" class="{{ 'active' if active_nav == 'coupons' else '' }}">🏷️ Coupons</a>
+        {% endif %}
+
+        {% if is_super %}
+        <div class="admin-sidebar__group-label">Admin</div>
+        <a href="/admin/admins" class="{{ 'active' if active_nav == 'admins' else '' }}">👤 Admin Users</a>
+        <a href="/admin/backup" class="{{ 'active' if active_nav == 'backup' else '' }}">💾 Backup</a>
+        <a href="/admin/activity-log" class="{{ 'active' if active_nav == 'activity-log' else '' }}">📜 Activity Log</a>
+        <a href="/admin/settings" class="{{ 'active' if active_nav == 'settings' else '' }}">⚙️ Settings</a>
+        {% endif %}
+
+        <div class="admin-sidebar__group-label">Account</div>
+        <a href="/admin/change-password" class="{{ 'active' if active_nav == 'change-password' else '' }}">🔑 Change Password</a>
+        <a href="/admin/logout">🚪 Log Out</a>
+        <a href="/" target="_blank" rel="noopener">🔗 View Store</a>
+      </nav>
+    </aside>
+    <div class="admin-main">
+      <div class="admin-topbar">
+        <button class="admin-mobile-toggle" id="admin-menu-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="admin-sidebar">☰</button>
+        <strong>{% block page_title %}Dashboard{% endblock %}</strong>
+        <span></span>
+      </div>
+      <div class="admin-content">
+        {% block admin_content %}{% endblock %}
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var toggle = document.getElementById('admin-menu-toggle');
+      var sidebar = document.getElementById('admin-sidebar');
+      if (toggle && sidebar) {
+        toggle.addEventListener('click', function () {
+          var isOpen = sidebar.classList.toggle('open');
+          toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+      }
+
+      // New-order badge: polled on an interval rather than pushed, so it
+      // works with zero notification infrastructure. Core admin flows
+      // (viewing/updating orders) never depend on this succeeding.
+      var badge = document.getElementById('new-order-badge');
+      function refreshBadge() {
+        fetch('/admin/api/new-order-count', { headers: { Accept: 'application/json' } })
+          .then(function (res) { return res.ok ? res.json() : null; })
+          .then(function (data) {
+            if (!data || !badge) return;
+            badge.innerHTML = data.count > 0 ? '<span class="notif-badge">' + data.count + '</span>' : '';
+          })
+          .catch(function () { /* silent: badge is a convenience, not required */ });
+      }
+      if (badge) {
+        refreshBadge();
+        setInterval(refreshBadge, 30000);
+      }
+    })();
+  </script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

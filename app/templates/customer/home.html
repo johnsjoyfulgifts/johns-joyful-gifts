@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% import "customer/_product_card.html" as cards with context %}
+{% import "customer/_category_card.html" as catcards %}
+{% import "_whatsapp_icon.html" as wa %}
+{% import "_stars.html" as stars_macro %}
+
+{% block content %}
+<div class="container">
+  <section class="banner-carousel" data-carousel aria-roledescription="carousel" aria-label="Promotions">
+    <div class="banner-carousel__viewport">
+      <div class="banner-carousel__track" data-carousel-track>
+        <div class="banner-carousel__slide" data-carousel-slide>
+          <img
+            src="/static/images/banners/banner-stationery-collection.webp"
+            alt="Small Gifts, Big Smiles! A handpicked collection of premium stationery and desk essentials — cute, useful and meaningful, perfect for students, parents and gift givers."
+            width="1536" height="1024" loading="eager" fetchpriority="high" draggable="false">
+        </div>
+        <div class="banner-carousel__slide" data-carousel-slide>
+          <img
+            src="/static/images/banners/banner-brand-intro.webp"
+            alt="John's Joyful Gifts — Stationery &amp; Return Gifts. Quality products, unique and useful gift items, affordable prices, made with love."
+            width="1536" height="1024" loading="eager" draggable="false">
+        </div>
+      </div>
+      <button type="button" class="banner-carousel__nav banner-carousel__nav--prev" data-carousel-prev aria-label="Previous banner">‹</button>
+      <button type="button" class="banner-carousel__nav banner-carousel__nav--next" data-carousel-next aria-label="Next banner">›</button>
+    </div>
+    <div class="banner-carousel__dots" data-carousel-dots role="tablist" aria-label="Banner navigation"></div>
+  </section>
+
+  <section class="hero">
+    <h1>{{ store.store_tagline }}</h1>
+    <p>Toys, stationery, school bags &amp; gifts — hand-picked with care, delivered with love.</p>
+    <div class="hero__actions">
+      <a class="btn btn-primary" href="/shop">Shop Now</a>
+      <a class="btn btn-whatsapp" href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener">{{ wa.whatsapp_icon(18) }} Chat on WhatsApp</a>
+    </div>
+  </section>
+
+  {% if categories %}
+  <section class="page-section">
+    <div class="section-tinted section-tinted--category">
+      <h2 class="section-title">🗂️ Shop by Category</h2>
+      <div class="category-card-row">
+        {% for cat in categories %}{{ catcards.category_card(cat) }}{% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if occasions %}
+  <section class="page-section">
+    <div class="section-tinted section-tinted--category">
+      <h2 class="section-title">🎉 Shop by Occasion</h2>
+      <div class="category-card-row">
+        {% for occ in occasions %}{{ catcards.category_card(occ, url_prefix='occasion', default_icon='🎉') }}{% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if age_groups %}
+  <section class="page-section">
+    <div class="section-tinted section-tinted--category">
+      <h2 class="section-title">🧒 Shop by Age</h2>
+      <div class="category-card-row">
+        {% for age in age_groups %}{{ catcards.category_card(age, url_prefix='age', default_icon='🎈') }}{% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="page-section">
+    <div class="section-tinted">
+      <h2 class="section-title">💰 Shop by Budget</h2>
+      <div class="budget-pill-row">
+        <a class="budget-pill" href="/shop?max_price=299">Under ₹299</a>
+        <a class="budget-pill" href="/shop?max_price=499">Under ₹499</a>
+        <a class="budget-pill" href="/shop?max_price=999">Under ₹999</a>
+        <a class="budget-pill" href="/shop?max_price=1499">Under ₹1499</a>
+        <a class="budget-pill" href="/shop?min_price=1500">₹1500+</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section">
+    <a href="/gift-finder" class="finder-cta">
+      <div class="finder-cta__text">
+        <div class="finder-cta__title">🎯 Not sure what to get?</div>
+        <div class="finder-cta__sub">Answer 4 quick questions and let us find the perfect gift for you.</div>
+      </div>
+      <span class="finder-cta__arrow">→</span>
+    </a>
+  </section>
+
+  <div id="recently-viewed-row" hidden></div>
+
+  {% if not has_any_products %}
+  <div class="empty-state">
+    <div class="empty-state__icon">🎁</div>
+    <h3>No products available right now.</h3>
+    <p>We're getting things ready — please check back soon, or message us on WhatsApp!</p>
+  </div>
+  {% endif %}
+
+  {% if featured %}
+  <section class="page-section">
+    <div class="section-title--row">
+      <h2 class="section-title mb-0">🌟 Featured Products</h2>
+      <a href="/shop" class="section-link">See all</a>
+    </div>
+    <div class="product-grid">
+      {% for p in featured %}{{ cards.product_card(p) }}{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if new_arrivals %}
+  <section class="page-section">
+    <div class="section-title--row">
+      <h2 class="section-title mb-0">✨ New Arrivals</h2>
+      <a href="/shop?sort=newest" class="section-link">See all</a>
+    </div>
+    <div class="product-grid">
+      {% for p in new_arrivals %}{{ cards.product_card(p) }}{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if bestsellers %}
+  <section class="page-section">
+    <div class="section-title--row">
+      <h2 class="section-title mb-0">🏆 Best Sellers</h2>
+      <a href="/shop" class="section-link">See all</a>
+    </div>
+    <div class="product-grid">
+      {% for p in bestsellers %}{{ cards.product_card(p) }}{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if special_offers %}
+  <section class="page-section">
+    <div class="section-title--row">
+      <h2 class="section-title mb-0">🔥 Special Offers</h2>
+      <a href="/shop" class="section-link">See all</a>
+    </div>
+    <div class="product-grid">
+      {% for p in special_offers %}{{ cards.product_card(p) }}{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if top_reviews %}
+  <section class="page-section">
+    <h2 class="section-title">💬 What Customers Say</h2>
+    <div class="home-reviews-row">
+      {% for r in top_reviews %}
+      <div class="home-review-card">
+        <div style="color:var(--color-accent);">{{ stars_macro.stars(r.rating) }}</div>
+        {% if r.review_text %}<p class="home-review-card__text">"{{ r.review_text }}"</p>{% endif %}
+        {% if r.photo_url %}<img src="{{ r.photo_url }}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px;margin:6px 0;">{% endif %}
+        <div class="home-review-card__meta">
+          <strong>{{ r.customer.name }}</strong>
+          {% if r.product %}<a href="/product/{{ r.product.slug }}" class="text-muted">on {{ r.product.name }}</a>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="page-section">
+    <div class="trust-grid">
+      <div class="trust-item"><div class="trust-item__icon">🚚</div><div class="trust-item__title">Reliable Delivery</div></div>
+      <div class="trust-item"><div class="trust-item__icon">💳</div><div class="trust-item__title">Secure UPI / Bank Payment</div></div>
+      <div class="trust-item"><div class="trust-item__icon">💬</div><div class="trust-item__title">Friendly WhatsApp Support</div></div>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var root = document.querySelector('[data-carousel]');
+  if (!root) return;
+  var track = root.querySelector('[data-carousel-track]');
+  var slides = Array.prototype.slice.call(root.querySelectorAll('[data-carousel-slide]'));
+  if (slides.length < 2) return; // nothing to rotate
+
+  var dotsWrap = root.querySelector('[data-carousel-dots]');
+  var prevBtn = root.querySelector('[data-carousel-prev]');
+  var nextBtn = root.querySelector('[data-carousel-next]');
+  var slideWidthPct = 100 / slides.length;
+  track.style.width = (slides.length * 100) + '%';
+  slides.forEach(function (slide) { slide.style.width = slideWidthPct + '%'; });
+
+  var index = 0;
+  var autoplayTimer = null;
+  var resumeTimer = null;
+  var AUTOPLAY_MS = 4500;
+  var RESUME_DELAY_MS = 3500;
+
+  var dots = slides.map(function (_, i) {
+    var dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = 'banner-carousel__dot';
+    dot.setAttribute('role', 'tab');
+    dot.setAttribute('aria-label', 'Go to slide ' + (i + 1));
+    dot.addEventListener('click', function () {
+      goTo(i);
+      pauseThenResume();
+    });
+    dotsWrap.appendChild(dot);
+    return dot;
+  });
+
+  function render() {
+    track.style.transform = 'translateX(-' + (index * slideWidthPct) + '%)';
+    dots.forEach(function (dot, i) {
+      var active = i === index;
+      dot.classList.toggle('active', active);
+      dot.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+  }
+
+  function goTo(i) {
+    index = (i + slides.length) % slides.length;
+    render();
+  }
+
+  function next() { goTo(index + 1); }
+  function prev() { goTo(index - 1); }
+
+  function startAutoplay() {
+    stopAutoplay();
+    autoplayTimer = window.setInterval(next, AUTOPLAY_MS);
+  }
+  function stopAutoplay() {
+    if (autoplayTimer) { window.clearInterval(autoplayTimer); autoplayTimer = null; }
+  }
+  function pauseThenResume() {
+    stopAutoplay();
+    if (resumeTimer) window.clearTimeout(resumeTimer);
+    resumeTimer = window.setTimeout(startAutoplay, RESUME_DELAY_MS);
+  }
+
+  prevBtn.addEventListener('click', function () { prev(); pauseThenResume(); });
+  nextBtn.addEventListener('click', function () { next(); pauseThenResume(); });
+  root.addEventListener('mouseenter', stopAutoplay);
+  root.addEventListener('mouseleave', startAutoplay);
+  root.addEventListener('focusin', stopAutoplay);
+  root.addEventListener('focusout', startAutoplay);
+  root.addEventListener('keydown', function (event) {
+    if (event.key === 'ArrowLeft') { prev(); pauseThenResume(); }
+    else if (event.key === 'ArrowRight') { next(); pauseThenResume(); }
+  });
+
+  // Drag / swipe, via Pointer Events (covers touch + mouse in one API).
+  var viewport = root.querySelector('.banner-carousel__viewport');
+  var dragStartX = null;
+  var dragDeltaX = 0;
+  var dragging = false;
+  var viewportWidth = 1;
+
+  viewport.addEventListener('pointerdown', function (event) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    dragging = true;
+    dragStartX = event.clientX;
+    dragDeltaX = 0;
+    viewportWidth = viewport.getBoundingClientRect().width || 1;
+    track.classList.add('is-dragging');
+    stopAutoplay();
+    try { viewport.setPointerCapture(event.pointerId); } catch (err) { /* ignore */ }
+  });
+
+  viewport.addEventListener('pointermove', function (event) {
+    if (!dragging) return;
+    dragDeltaX = event.clientX - dragStartX;
+    var basePct = index * slideWidthPct;
+    var dragPct = (dragDeltaX / viewportWidth) * slideWidthPct;
+    track.style.transform = 'translateX(-' + (basePct - dragPct) + '%)';
+  });
+
+  function endDrag() {
+    if (!dragging) return;
+    dragging = false;
+    track.classList.remove('is-dragging');
+    var threshold = viewportWidth * 0.15;
+    if (dragDeltaX > threshold) prev();
+    else if (dragDeltaX < -threshold) next();
+    else render(); // snap back to the current slide
+    pauseThenResume();
+  }
+
+  viewport.addEventListener('pointerup', endDrag);
+  viewport.addEventListener('pointercancel', endDrag);
+
+  render();
+  startAutoplay();
+})();
+</script>
+{% endblock %}

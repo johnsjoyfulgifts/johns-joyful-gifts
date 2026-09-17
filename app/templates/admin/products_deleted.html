@@ -1,0 +1,56 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Deleted Products — Admin{% endblock %}
+{% block page_title %}Deleted Products{% endblock %}
+
+{% block admin_content %}
+<div class="flex justify-between items-center" style="margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+  <span class="text-muted">{{ products|length }} deleted product{{ '' if products|length == 1 else 's' }}</span>
+  <a class="btn btn-secondary btn-sm" href="/admin/products">← Back to Products</a>
+</div>
+
+{% if products %}
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead><tr><th>Image</th><th>Name</th><th>SKU</th><th>Category</th><th>Price</th><th>Deleted</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for p in products %}
+      <tr>
+        <td><div class="thumb-preview" style="width:44px;height:44px;">{% if p.primary_image %}<img src="{{ p.primary_image.display_thumbnail }}" alt="" loading="lazy">{% endif %}</div></td>
+        <td>{{ p.name }}</td>
+        <td class="text-muted">{{ p.sku or '—' }}</td>
+        <td class="text-muted">{{ p.category.name if p.category else '—' }}</td>
+        <td>₹{{ "%.0f"|format(p.price) }}</td>
+        <td class="text-muted">{{ p.deleted_at.strftime('%d %b %Y') if p.deleted_at else '—' }}</td>
+        <td>
+          <form method="post" action="/admin/products/{{ p.id }}/restore" style="display:inline;"><button type="submit" class="btn btn-sm btn-secondary">Restore</button></form>
+          <form method="post" action="/admin/products/{{ p.id }}/delete-permanent" style="display:inline;" onsubmit="return confirm('Permanently delete this product? This cannot be undone — all images and product data will be lost forever.');"><button type="submit" class="btn btn-sm btn-danger">Delete Permanently</button></form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="admin-card-list">
+  {% for p in products %}
+  <div class="admin-record-card">
+    <div class="flex gap-12 items-center">
+      <div class="thumb-preview" style="width:56px;height:56px;flex-shrink:0;">{% if p.primary_image %}<img src="{{ p.primary_image.display_thumbnail }}" alt="" loading="lazy">{% endif %}</div>
+      <div style="flex:1;">
+        <strong>{{ p.name }}</strong>
+        <div class="text-muted" style="font-size:0.8rem;">{{ p.sku or '—' }} · ₹{{ "%.0f"|format(p.price) }}</div>
+        <div class="text-muted" style="font-size:0.75rem;">Deleted {{ p.deleted_at.strftime('%d %b %Y') if p.deleted_at else '—' }}</div>
+      </div>
+    </div>
+    <div class="flex gap-8" style="margin-top:10px; flex-wrap:wrap;">
+      <form method="post" action="/admin/products/{{ p.id }}/restore"><button type="submit" class="btn btn-sm btn-secondary">Restore</button></form>
+      <form method="post" action="/admin/products/{{ p.id }}/delete-permanent" onsubmit="return confirm('Permanently delete this product? This cannot be undone — all images and product data will be lost forever.');"><button type="submit" class="btn btn-sm btn-danger">Delete Permanently</button></form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state"><h3>No deleted products.</h3><p>Products you delete will appear here so you can restore them later.</p></div>
+{% endif %}
+{% endblock %}

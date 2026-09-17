@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Checkout — {{ store.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container page-section">
+  <h1 class="section-title">Checkout</h1>
+
+  {% if not lines %}
+  <div class="empty-state">
+    <div class="empty-state__icon">🛒</div>
+    <h3>Your cart is waiting for something joyful!</h3>
+    <p>Add a few products before checking out.</p>
+    <a class="btn btn-primary" href="/shop" style="margin-top:12px;">Shop Now</a>
+  </div>
+  {% else %}
+  <div style="display:grid; gap:24px;" class="checkout-layout">
+    <div class="card">
+      <div id="checkout-alert"></div>
+      <form id="checkout-form" novalidate>
+        <h2 style="font-size:1rem; margin-top:0;">Delivery Details</h2>
+        <p class="text-muted" style="font-size:0.85rem; margin-top:-8px;">
+          Delivering to {{ customer.name }} ({{ customer.mobile }}) — <a href="/account">not you?</a>
+        </p>
+        <div class="form-group">
+          <label for="address">Address *</label>
+          <textarea class="form-control" id="address" name="address" rows="2" required autocomplete="street-address">{{ customer.address or '' }}</textarea>
+        </div>
+        <div class="form-row form-row--3">
+          <div class="form-group">
+            <label for="city">City *</label>
+            <input class="form-control" id="city" name="city" value="{{ customer.city or '' }}" required autocomplete="address-level2">
+          </div>
+          <div class="form-group">
+            <label for="state">State *</label>
+            <input class="form-control" id="state" name="state" value="{{ customer.state or '' }}" required autocomplete="address-level1">
+          </div>
+          <div class="form-group">
+            <label for="pincode">Pincode *</label>
+            <input class="form-control" id="pincode" name="pincode" value="{{ customer.pincode or '' }}" required inputmode="numeric" autocomplete="postal-code">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="delivery_instructions">Delivery Instructions (optional)</label>
+          <textarea class="form-control" id="delivery_instructions" name="delivery_instructions" rows="2"></textarea>
+        </div>
+
+        <h2 style="font-size:1rem;">🎁 Gift Options (optional)</h2>
+        <div class="form-group">
+          <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+            <input type="checkbox" name="gift_wrap" value="true" id="gift_wrap">
+            Wrap this as a gift
+          </label>
+        </div>
+        <div class="form-group">
+          <label for="gift_message">Gift Message (optional)</label>
+          <textarea class="form-control" id="gift_message" name="gift_message" rows="2" maxlength="300" placeholder="Write a short note for the recipient..."></textarea>
+        </div>
+        {% if gift_options %}
+        <div class="form-group">
+          <label>Add Gift Extras</label>
+          {% for opt in gift_options %}
+          <label style="display:flex; align-items:center; gap:8px; font-weight:400; margin-top:4px;">
+            <input type="checkbox" name="gift_option_ids" value="{{ opt.id }}" class="js-gift-option" data-price="{{ opt.price }}">
+            {{ opt.name }} — ₹{{ "%.0f"|format(opt.price) }}
+          </label>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <h2 style="font-size:1rem;">Coupon Code (optional)</h2>
+        <div class="form-group">
+          <div class="flex gap-8">
+            <input class="form-control" id="coupon_code" name="coupon_code" placeholder="Enter coupon code" style="text-transform:uppercase;">
+            <button type="button" class="btn btn-secondary" id="apply-coupon-btn">Apply</button>
+          </div>
+          <p id="coupon-feedback" class="field-hint"></p>
+        </div>
+
+        <h2 style="font-size:1rem;">Payment Method</h2>
+        {% if manual_payment_available %}
+        <input type="hidden" name="payment_method" value="manual">
+        <p class="badge badge--info">UPI / Bank Transfer</p>
+        <p class="field-hint">Payment details (UPI ID / bank account, with a QR code) are shown on the next page — pay directly, no gateway involved.</p>
+        {% else %}
+        <p class="alert alert--error">Online payment isn't set up yet. Please <a href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener">message us on WhatsApp</a> to place your order.</p>
+        {% endif %}
+
+        <button type="submit" class="btn btn-primary btn-block" id="place-order-btn" style="margin-top:16px;" {{ 'disabled' if not manual_payment_available }}>
+          Place Order — ₹{{ "%.0f"|format(total) }}
+        </button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:1rem; margin-top:0;">Order Summary</h2>
+      {% for line in lines %}
+      <div class="cart-summary-row"><span>{{ line.product.name }} × {{ line.quantity }}</span><span>₹{{ "%.0f"|format(line.subtotal) }}</span></div>
+      {% if line.personalization %}
+      <p class="field-hint" style="margin:-4px 0 6px;">
+        🎁 Personalized{% if line.personalization.name %} — {{ line.personalization.name }}{% endif %}{% if line.personalization.date %} · {{ line.personalization.date }}{% endif %}
+      </p>
+      {% endif %}
+      {% endfor %}
+      <div class="cart-summary-row"><span>Subtotal</span><span id="summary-subtotal">₹{{ "%.0f"|format(subtotal) }}</span></div>
+      <div class="cart-summary-row"><span>Delivery</span><span>{{ '₹%.0f'|format(delivery_charge) if delivery_charge else 'FREE' }}</span></div>
+      <div class="cart-summary-row" id="summary-discount-row" style="display:none; color:var(--color-success);"><span>Coupon Discount</span><span id="summary-discount">−₹0</span></div>
+      <div class="cart-summary-row cart-summary-row--total"><span>Total</span><span id="summary-total">₹{{ "%.0f"|format(total) }}</span></div>
+    </div>
+  </div>
+  <style>@media (min-width: 780px) { .checkout-layout { grid-template-columns: 2fr 1fr; align-items: start; } }</style>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var form = document.getElementById('checkout-form');
+  if (!form) return;
+  var btn = document.getElementById('place-order-btn');
+  var alertBox = document.getElementById('checkout-alert');
+  var baseSubtotal = {{ subtotal }};
+  var baseDeliveryCharge = {{ delivery_charge }};
+  var currentDiscount = 0;
+
+  function giftOptionsCharge() {
+    var total = 0;
+    document.querySelectorAll('.js-gift-option:checked').forEach(function (cb) {
+      total += parseFloat(cb.getAttribute('data-price')) || 0;
+    });
+    return total;
+  }
+
+  function renderTotals(discountAmount) {
+    currentDiscount = discountAmount;
+    var giftCharges = giftOptionsCharge();
+    var total = Math.max(0, baseSubtotal + baseDeliveryCharge + giftCharges - discountAmount);
+    var discountRow = document.getElementById('summary-discount-row');
+    if (discountAmount > 0) {
+      discountRow.style.display = '';
+      document.getElementById('summary-discount').textContent = '−₹' + discountAmount.toFixed(0);
+    } else {
+      discountRow.style.display = 'none';
+    }
+    document.getElementById('summary-total').textContent = '₹' + total.toFixed(0);
+    btn.textContent = 'Place Order — ₹' + total.toFixed(0);
+  }
+
+  document.querySelectorAll('.js-gift-option').forEach(function (cb) {
+    cb.addEventListener('change', function () { renderTotals(currentDiscount); });
+  });
+
+  var applyCouponBtn = document.getElementById('apply-coupon-btn');
+  var couponInput = document.getElementById('coupon_code');
+  var couponFeedback = document.getElementById('coupon-feedback');
+  if (applyCouponBtn) {
+    applyCouponBtn.addEventListener('click', async function () {
+      var code = couponInput.value.trim();
+      if (!code) return;
+      applyCouponBtn.disabled = true;
+      couponFeedback.textContent = 'Checking...';
+      couponFeedback.style.color = 'var(--color-text-muted)';
+      try {
+        var res = await fetch('/api/coupon/validate', {
+          method: 'POST',
+          body: new URLSearchParams({ code: code }),
+          headers: { Accept: 'application/json' },
+        });
+        var body = await res.json();
+        if (!res.ok || !body.valid) {
+          couponFeedback.textContent = body.detail || 'This coupon isn\'t valid.';
+          couponFeedback.style.color = 'var(--color-danger)';
+          renderTotals(0);
+          return;
+        }
+        couponFeedback.textContent = 'Coupon applied — you saved ₹' + body.discount_amount.toFixed(0) + '!';
+        couponFeedback.style.color = 'var(--color-success)';
+        renderTotals(body.discount_amount);
+      } catch (err) {
+        couponFeedback.textContent = 'Could not check this coupon right now.';
+        couponFeedback.style.color = 'var(--color-danger)';
+      } finally {
+        applyCouponBtn.disabled = false;
+      }
+    });
+  }
+
+  // One idempotency key per checkout attempt on this cart. It's only
+  // regenerated after a successful order, so double-clicks, refreshes, or
+  // slow-network retries during the SAME attempt reuse the same key and the
+  // server returns the original order instead of creating a duplicate.
+  function getIdempotencyKey() {
+    var key = sessionStorage.getItem('jjg_checkout_key');
+    if (!key) {
+      key = 'ck_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2);
+      sessionStorage.setItem('jjg_checkout_key', key);
+    }
+    return key;
+  }
+
+  function showError(message) {
+    alertBox.innerHTML = '<div class="alert alert--error" role="alert">' + message + '</div>';
+  }
+
+  function resetButton() {
+    btn.disabled = false;
+    renderTotals(currentDiscount);
+  }
+
+  form.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    // The form has novalidate (we submit via fetch, not a real page
+    // navigation), so the browser's built-in "please fill this out" check
+    // never runs on its own — ask for it explicitly. This is what actually
+    // points the customer at the one empty field (state, most often, since
+    // browser autofill frequently skips it) instead of a vague banner.
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
+    if (btn.disabled) return; // duplicate-submission lock
+    btn.disabled = true;
+    btn.textContent = 'Placing your order...';
+    alertBox.innerHTML = '';
+
+    var data = Object.fromEntries(new FormData(form).entries());
+    data.idempotency_key = getIdempotencyKey();
+    // Object.fromEntries collapses repeated keys to the last value, which
+    // would silently drop all but one selected gift option — collect the
+    // checked ones explicitly instead.
+    data.gift_option_ids = Array.from(document.querySelectorAll('.js-gift-option:checked')).map(function (cb) {
+      return parseInt(cb.value, 10);
+    });
+
+    try {
+      var res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(data),
+      });
+      var body = await res.json();
+      if (!res.ok) {
+        showError(body.detail || 'Something went wrong. Please try again.');
+        resetButton();
+        return;
+      }
+      sessionStorage.removeItem('jjg_checkout_key');
+      window.location.href = '/order/' + encodeURIComponent(body.order_number) + '/success';
+    } catch (err) {
+      showError('Your internet connection seems to be unavailable. Please check your connection and try again.');
+      resetButton();
+    }
+  });
+})();
+</script>
+{% endblock %}

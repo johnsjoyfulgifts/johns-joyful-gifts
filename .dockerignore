@@ -1,0 +1,16 @@
+.git/
+.venv/
+__pycache__/
+*.pyc
+.env
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+uploads/*
+!uploads/.gitkeep
+.pytest_cache/
+*.log
+tests/
+README.md
+fly.toml.example

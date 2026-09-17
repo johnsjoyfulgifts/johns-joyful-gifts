@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}{{ store.store_name }} — {{ store.store_tagline }}{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}{{ store.store_name }}: {{ store.store_tagline }}. Shop toys, stationery, school bags, kids products and gifts online.{% endblock %}">
+  <meta property="og:title" content="{{ store.store_name }}">
+  <meta property="og:description" content="{{ store.store_tagline }}">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#6B7350">
+  <link rel="canonical" href="{{ request.url.scheme }}://{{ request.url.netloc }}{{ request.url.path }}">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="icon" href="/static/icons/favicon.png">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": {{ store.store_name | tojson }},
+    "url": {{ (request.url.scheme ~ "://" ~ request.url.netloc) | tojson }}
+    {%- if store.contact_email %}, "email": {{ store.contact_email | tojson }}{% endif -%}
+    {%- if store.instagram_url %}, "sameAs": [{{ store.instagram_url | tojson }}]{% endif %}
+  }
+  </script>
+  {% block extra_head %}{% endblock %}
+</head>
+{% import "_whatsapp_icon.html" as wa %}
+<body data-recently-viewed-slug="{{ product.slug if product is defined and product else '' }}">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  {% if store.announcement_enabled == 'true' and store.announcement_text %}
+  <div class="announcement-bar" id="announcement-bar" data-text="{{ store.announcement_text }}">
+    <span>{{ store.announcement_text }}</span>
+    <button type="button" class="announcement-bar__close" id="announcement-close" aria-label="Dismiss announcement">×</button>
+  </div>
+  <script>
+    (function () {
+      var bar = document.getElementById('announcement-bar');
+      if (!bar) return;
+      var key = 'jjg-announcement-dismissed';
+      if (localStorage.getItem(key) === bar.getAttribute('data-text')) {
+        bar.style.display = 'none';
+        return;
+      }
+      document.getElementById('announcement-close').addEventListener('click', function () {
+        localStorage.setItem(key, bar.getAttribute('data-text'));
+        bar.style.display = 'none';
+      });
+    })();
+  </script>
+  {% endif %}
+
+  <header class="site-header">
+    <div class="site-header__bar">
+      <button type="button" class="mobile-menu-toggle" id="mobile-menu-open" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-drawer">☰</button>
+      <a class="brand" href="/" aria-label="{{ store.store_name }} home">
+        <img class="brand__logo" src="/static/icons/logo-icon.png" alt="" width="34" height="34">
+        <span>{{ store.store_name }}</span>
+      </a>
+      <div class="header-search">
+        <form action="/search" method="get" role="search">
+          <label for="site-search" class="visually-hidden">Search products</label>
+          <input id="site-search" type="search" name="q" placeholder="Search toys, gifts, stationery..." value="{{ request.query_params.get('q', '') }}">
+          <button type="submit" aria-label="Search">🔍</button>
+        </form>
+      </div>
+      <div class="header-actions">
+        <a class="icon-link" href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">{{ wa.whatsapp_icon(20) }}</a>
+        {% if current_customer %}
+        <a class="icon-link" href="/account" aria-label="My Account, {{ current_customer.name }}">
+          {% if current_customer.profile_picture_url %}<img src="{{ current_customer.profile_picture_url }}" alt="" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">{% else %}👤{% endif %}
+        </a>
+        {% else %}
+        <a class="icon-link" href="/login" aria-label="Log In">👤</a>
+        {% endif %}
+        <a class="icon-link" href="/wishlist" id="wishlist-icon-link" aria-label="My Wishlist">
+          ❤️
+        </a>
+        <a class="icon-link" href="/cart" aria-label="View cart, {{ cart_count|default(0) }} items">
+          🛒
+          {% if cart_count %}<span class="cart-badge">{{ cart_count }}</span>{% endif %}
+        </a>
+      </div>
+    </div>
+    <nav class="site-nav" aria-label="Product categories">
+      <ul class="site-nav__list">
+        <li><a href="/shop">All Products</a></li>
+        <li><a href="/gift-finder">🎯 Gift Finder</a></li>
+        <li><a href="/combos">🎀 Gift Combos</a></li>
+        {% for cat in nav_categories %}
+        <li><a href="/category/{{ cat.slug }}">{{ cat.name }}</a></li>
+        {% endfor %}
+      </ul>
+    </nav>
+  </header>
+
+  <div class="mobile-drawer-overlay" id="mobile-drawer-overlay"></div>
+  <nav class="mobile-drawer" id="mobile-drawer" aria-label="Menu" aria-hidden="true">
+    <div class="mobile-drawer__head">
+      <span class="brand" style="font-size:1.05rem;">{{ store.store_name }}</span>
+      <button type="button" class="mobile-drawer__close" id="mobile-menu-close" aria-label="Close menu">×</button>
+    </div>
+    <ul class="mobile-drawer__list">
+      <li><a href="/">🏠 Home</a></li>
+      <li><a href="/shop">🛍️ Shop All</a></li>
+      <li><a href="/gift-finder">🎯 Gift Finder</a></li>
+      <li><a href="/combos">🎀 Gift Combos</a></li>
+      <li><a href="/wishlist">❤️ Wishlist</a></li>
+      <li><a href="/cart">🛒 Cart</a></li>
+      <li><a href="{{ '/account' if current_customer else '/login' }}">👤 {{ 'My Account' if current_customer else 'Log In' }}</a></li>
+      <li><a href="/track-order">📦 Track Order</a></li>
+    </ul>
+    {% if nav_categories %}
+    <div class="mobile-drawer__section">Categories</div>
+    <ul class="mobile-drawer__list">
+      {% for cat in nav_categories %}
+      <li><a href="/category/{{ cat.slug }}">{{ cat.name }}</a></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <div class="mobile-drawer__section">Get in Touch</div>
+    <ul class="mobile-drawer__list">
+      <li><a href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener">{{ wa.whatsapp_icon(16) }} WhatsApp Us</a></li>
+      <li><a href="/contact">✉️ Contact</a></li>
+    </ul>
+  </nav>
+
+  <main id="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <a class="whatsapp-float" href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener" aria-label="Chat with us on WhatsApp">{{ wa.whatsapp_icon(22) }}<span class="whatsapp-float__label">WhatsApp</span></a>
+
+  <nav class="bottom-nav" aria-label="Primary">
+    <a href="/" class="bottom-nav__item {{ 'active' if request.url.path == '/' }}"><span class="bottom-nav__icon">🏠</span>Home</a>
+    <a href="/shop" class="bottom-nav__item {{ 'active' if request.url.path == '/shop' }}"><span class="bottom-nav__icon">🛍️</span>Shop</a>
+    <a href="/wishlist" class="bottom-nav__item {{ 'active' if request.url.path == '/wishlist' }}"><span class="bottom-nav__icon">❤️</span>Wishlist</a>
+    <a href="/cart" class="bottom-nav__item {{ 'active' if request.url.path == '/cart' }}"><span class="bottom-nav__icon">🛒{% if cart_count %}<span class="cart-badge" style="top:-6px;right:-10px;">{{ cart_count }}</span>{% endif %}</span>Cart</a>
+    <a href="{{ '/account' if current_customer else '/login' }}" class="bottom-nav__item {{ 'active' if request.url.path in ('/account', '/login') }}"><span class="bottom-nav__icon">👤</span>{{ 'Account' if current_customer else 'Log In' }}</a>
+  </nav>
+
+  <div class="quick-view-overlay" id="quick-view-overlay" hidden>
+    <div class="quick-view-modal" role="dialog" aria-modal="true" aria-label="Quick view">
+      <button type="button" class="quick-view-modal__close" id="quick-view-close" aria-label="Close quick view">×</button>
+      <div class="quick-view-modal__body" id="quick-view-body"></div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <h4>{{ store.store_name }}</h4>
+          <p style="opacity:0.85; font-size:0.85rem;">{{ store.store_tagline }}</p>
+          <ul>
+            <li><a href="{{ whatsapp_chat_link }}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;">{{ wa.whatsapp_icon(16) }} WhatsApp Us</a></li>
+            <li><a href="{{ store.instagram_url }}" target="_blank" rel="noopener">📷 Instagram</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Shop</h4>
+          <ul>
+            <li><a href="/shop">All Products</a></li>
+            <li><a href="/track-order">Track Order</a></li>
+            <li><a href="/cart">Cart</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Company</h4>
+          <ul>
+            <li><a href="/about">About Us</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Policies</h4>
+          <ul>
+            <li><a href="/privacy-policy">Privacy Policy</a></li>
+            <li><a href="/terms">Terms &amp; Conditions</a></li>
+            <li><a href="/shipping-policy">Shipping Policy</a></li>
+            <li><a href="/refund-policy">Cancellation / Refund Policy</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        &copy; {{ current_year }} {{ store.store_name }}. All rights reserved.
+        &middot; <a href="/admin/login" style="opacity:0.8;">Admin Login</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/static/js/cart.js"></script>
+  <script src="/static/js/recently-viewed.js"></script>
+  <script src="/static/js/quick-view.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').catch(function () { /* PWA install is a bonus, not required */ });
+      });
+    }
+  </script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

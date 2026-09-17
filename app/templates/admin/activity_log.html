@@ -1,0 +1,51 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Activity Log — Admin{% endblock %}
+{% block page_title %}Activity Log{% endblock %}
+
+{% block admin_content %}
+<div class="flex justify-between items-center" style="margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+  <span class="text-muted">{{ total }} recorded action{{ '' if total == 1 else 's' }}</span>
+</div>
+
+{% if entries %}
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead><tr><th>Date/Time</th><th>Admin</th><th>Action</th><th>Details</th></tr></thead>
+    <tbody>
+      {% for e in entries %}
+      <tr>
+        <td class="text-muted" style="white-space:nowrap;">{{ e.created_at.strftime('%d %b %Y, %I:%M %p') if e.created_at else '—' }}</td>
+        <td>{{ e.admin_name }}</td>
+        <td><span class="badge badge--muted">{{ e.action }}</span></td>
+        <td>{{ e.description }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="admin-card-list">
+  {% for e in entries %}
+  <div class="admin-record-card">
+    <div class="flex justify-between items-center">
+      <span class="badge badge--muted">{{ e.action }}</span>
+      <span class="text-muted" style="font-size:0.75rem;">{{ e.created_at.strftime('%d %b %Y, %I:%M %p') if e.created_at else '—' }}</span>
+    </div>
+    <p style="margin:8px 0 2px;">{{ e.description }}</p>
+    <p class="text-muted" style="font-size:0.8rem; margin:0;">by {{ e.admin_name }}</p>
+  </div>
+  {% endfor %}
+</div>
+
+{% if total_pages > 1 %}
+<div class="flex gap-8 justify-between" style="margin-top:16px;">
+  {% if page > 1 %}<a class="btn btn-sm btn-secondary" href="?page={{ page - 1 }}">← Previous</a>{% else %}<span></span>{% endif %}
+  <span class="text-muted">Page {{ page }} of {{ total_pages }}</span>
+  {% if page < total_pages %}<a class="btn btn-sm btn-secondary" href="?page={{ page + 1 }}">Next →</a>{% else %}<span></span>{% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state"><h3>No activity recorded yet.</h3><p>Admin actions like creating, editing, or deleting products will show up here.</p></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Backup — Admin{% endblock %}
+{% block page_title %}Database Backup{% endblock %}
+
+{% block admin_content %}
+<div class="card" style="max-width:640px;">
+  <h2 style="font-size:1rem; margin-top:0;">Manual Backup</h2>
+  <p class="text-muted">
+    Downloads every product, order, customer, and setting as a single JSON file — a safety copy you can keep
+    somewhere private (your own computer, cloud drive) in case anything ever goes wrong.
+  </p>
+  <p>
+    <strong>Last backup:</strong>
+    {% if last_backup_at %}{{ last_backup_at[:19].replace('T', ' ') }} UTC{% else %}<span class="text-muted">Never</span>{% endif %}
+  </p>
+  <a class="btn btn-primary" href="/admin/backup/download">⬇️ Download Backup Now</a>
+</div>
+
+<div class="card" style="max-width:640px; margin-top:16px;">
+  <h2 style="font-size:1rem; margin-top:0;">About Automatic Backups</h2>
+  <p class="text-muted">
+    This site's database runs on Supabase's free tier, which does not include automatic scheduled backups —
+    that's a paid feature on Supabase's paid plans. To stay completely free, this site does not rely on it.
+  </p>
+  <p class="text-muted">
+    Instead: download a manual backup above whenever you make significant changes (e.g. after adding a batch of
+    new products), and keep the file somewhere safe. A monthly habit is reasonable for a shop this size.
+  </p>
+</div>
+{% endblock %}

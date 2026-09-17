@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin Login — {{ store.store_name }}</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="/static/icons/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="admin-body">
+  <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;">
+    <div class="card" style="max-width:380px; width:100%;">
+      <img src="/static/icons/logo-icon.png" alt="" width="48" height="48" style="display:block; margin:0 auto 8px; border-radius:50%;">
+      <h1 style="text-align:center; font-size:1.2rem;">{{ store.store_name }}</h1>
+      <p class="text-muted text-center" style="margin-top:-8px;">Admin Login</p>
+
+      {% if error %}<div class="alert alert--error">{{ error }}</div>{% endif %}
+
+      <form method="post" action="/admin/login">
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input class="form-control" type="email" id="email" name="email" value="{{ email or '' }}" required autofocus autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input class="form-control" type="password" id="password" name="password" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Log In</button>
+      </form>
+      <p class="text-muted text-center" style="font-size:0.78rem; margin-top:14px;">
+        No admin account yet? Run <code>python scripts/create_admin.py</code> on the server.
+      </p>
+    </div>
+  </div>
+</body>
+</html>

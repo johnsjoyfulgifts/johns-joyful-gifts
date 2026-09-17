@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Gift Combos — {{ store.store_name }}{% endblock %}
+{% block meta_description %}Handpicked gift combos — bundled products for occasions, birthdays and more, at a glance savings.{% endblock %}
+
+{% block content %}
+<div class="container">
+  <section class="page-section">
+    <h1 class="section-title">🎀 Gift Combos</h1>
+    <p class="text-muted">Handpicked bundles that go great together.</p>
+
+    {% if bundles %}
+    <div class="product-grid">
+      {% for b in bundles %}
+      <div class="product-card">
+        <div class="product-card__img">
+          <a href="/combo/{{ b.slug }}" aria-label="{{ b.name }}" style="display:block;width:100%;height:100%;">
+            {% if b.image %}
+              <img src="{{ b.image }}" alt="{{ b.name }}" loading="lazy">
+            {% else %}
+              <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;">🎀</div>
+            {% endif %}
+          </a>
+        </div>
+        <div class="product-card__body">
+          <a href="/combo/{{ b.slug }}"><div class="product-card__name">{{ b.name }}</div></a>
+          <p class="text-muted" style="font-size:0.85rem;">{{ b.items|length }} products included</p>
+          {% if b.bundle_price %}
+            <div class="product-card__price">
+              <span class="price">₹{{ '%.0f'|format(b.bundle_price) }}</span>
+            </div>
+            {% if b.savings %}<span class="badge badge--success">Save ₹{{ '%.0f'|format(b.savings) }}</span>{% endif %}
+          {% endif %}
+          <div class="product-card__cta">
+            <a class="btn btn-primary btn-sm btn-block" href="/combo/{{ b.slug }}">View Combo</a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state__icon">🎀</div>
+      <h3>No gift combos available right now.</h3>
+      <p>Check back soon, or <a href="/shop">browse our full shop</a>.</p>
+    </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

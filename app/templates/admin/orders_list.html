@@ -1,0 +1,60 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Orders — Admin{% endblock %}
+{% block page_title %}Orders{% endblock %}
+
+{% block admin_content %}
+<div class="flex justify-between items-center" style="margin-bottom:14px;">
+  <span class="text-muted">{{ total }} orders</span>
+</div>
+
+<form class="filter-bar" method="get">
+  <input type="text" name="q" placeholder="Search order #, name, mobile..." value="{{ q }}">
+  <select name="status">
+    <option value="" {{ 'selected' if not status }}>All Status</option>
+    {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if status == s }}>{{ s }}</option>{% endfor %}
+  </select>
+  <button type="submit" class="btn btn-sm btn-secondary">Filter</button>
+</form>
+
+{% if orders %}
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead><tr><th>Order #</th><th>Customer</th><th>Mobile</th><th>Total</th><th>Status</th><th>Placed</th></tr></thead>
+    <tbody>
+      {% for o in orders %}
+      <tr>
+        <td><a href="/admin/orders/{{ o.order_number }}">{{ o.order_number }}</a> {% if not o.viewed_by_admin %}<span class="notif-badge">NEW</span>{% endif %}</td>
+        <td>{{ o.customer.name }}</td>
+        <td>{{ o.customer.mobile }}</td>
+        <td>₹{{ "%.0f"|format(o.total) }}</td>
+        <td><span class="badge badge--info">{{ o.order_status }}</span></td>
+        <td>{{ o.created_at.strftime('%d %b %Y, %I:%M %p') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="admin-card-list">
+  {% for o in orders %}
+  <a class="admin-record-card" href="/admin/orders/{{ o.order_number }}" style="display:block;">
+    <div class="admin-record-card__row"><span>Order</span><span>{{ o.order_number }} {% if not o.viewed_by_admin %}<span class="notif-badge">NEW</span>{% endif %}</span></div>
+    <div class="admin-record-card__row"><span>Customer</span><span>{{ o.customer.name }}</span></div>
+    <div class="admin-record-card__row"><span>Total</span><span>₹{{ "%.0f"|format(o.total) }}</span></div>
+    <div class="admin-record-card__row"><span>Status</span><span class="badge badge--info">{{ o.order_status }}</span></div>
+  </a>
+  {% endfor %}
+</div>
+
+{% if total_pages > 1 %}
+<div class="flex gap-8 justify-between" style="margin-top:16px;">
+  {% if page > 1 %}<a class="btn btn-sm btn-secondary" href="?{{ request.url.include_query_params(page=page-1).query }}">← Previous</a>{% else %}<span></span>{% endif %}
+  <span class="text-muted">Page {{ page }} of {{ total_pages }}</span>
+  {% if page < total_pages %}<a class="btn btn-sm btn-secondary" href="?{{ request.url.include_query_params(page=page+1).query }}">Next →</a>{% else %}<span></span>{% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state"><h3>No orders found.</h3></div>
+{% endif %}
+{% endblock %}

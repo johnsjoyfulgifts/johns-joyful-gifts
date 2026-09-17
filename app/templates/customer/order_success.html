@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% import "_whatsapp_icon.html" as wa %}
+{% block title %}Order Placed — {{ store.store_name }}{% endblock %}
+
+{% block content %}
+<div class="container page-section text-center">
+  <div style="font-size:3rem;">🎉</div>
+  <h1>Thank you! Your order is confirmed.</h1>
+  <p class="text-muted">Order Number</p>
+  <p style="font-size:1.4rem; font-weight:800; color:var(--color-primary-dark);">{{ order.order_number }}</p>
+
+  <div class="card" style="max-width:480px; margin:20px auto; text-align:left;">
+    {% for item in order.items %}
+    <div class="cart-summary-row"><span>{{ item.product_name_snapshot }} × {{ item.quantity }}</span><span>₹{{ "%.0f"|format(item.subtotal) }}</span></div>
+    {% endfor %}
+    <div class="cart-summary-row"><span>Delivery</span><span>{{ '₹%.0f'|format(order.delivery_charge) if order.delivery_charge else 'FREE' }}</span></div>
+    {% for opt in order.gift_options %}
+    <div class="cart-summary-row"><span>{{ opt.name_snapshot }}</span><span>₹{{ "%.0f"|format(opt.price_snapshot) }}</span></div>
+    {% endfor %}
+    {% if order.discount_amount %}
+    <div class="cart-summary-row" style="color:var(--color-success);"><span>Coupon ({{ order.coupon_code }})</span><span>−₹{{ "%.0f"|format(order.discount_amount) }}</span></div>
+    {% endif %}
+    <div class="cart-summary-row cart-summary-row--total"><span>Total</span><span>₹{{ "%.0f"|format(order.total) }}</span></div>
+    <p class="text-muted" style="font-size:0.85rem; margin-top:10px;">Payment: {{ order.payment_method }}</p>
+    {% if order.gift_wrap or order.gift_message %}
+    <div style="border-top:1px solid var(--color-border); margin-top:10px; padding-top:10px;">
+      {% if order.gift_wrap %}<p class="badge badge--info">🎁 Gift Wrapped</p>{% endif %}
+      {% if order.gift_message %}<p class="text-muted" style="font-size:0.85rem; font-style:italic; margin-top:6px;">"{{ order.gift_message }}"</p>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {% if order.payment_method == "UPI / Bank Transfer" %}
+  <div class="card" style="max-width:480px; margin:0 auto 20px; text-align:left;">
+    <h2 style="font-size:1rem; margin-top:0;">Complete Your Payment</h2>
+    {% if upi_id %}
+    <div class="text-center" style="margin:12px 0;">
+      <img src="/order/{{ order.order_number }}/payment-qr.png" alt="Scan to pay via UPI" style="width:180px; height:180px; border:1px solid var(--color-border); border-radius:var(--radius-sm);">
+      <p style="margin-top:8px;"><strong>UPI ID:</strong> <code>{{ upi_id }}</code></p>
+    </div>
+    {% endif %}
+    {% if bank_account_number %}
+    <div style="font-size:0.88rem; margin-top:10px; border-top:1px solid var(--color-border); padding-top:10px;">
+      <p style="margin:2px 0;"><strong>Bank Transfer</strong></p>
+      {% if bank_account_name %}<p style="margin:2px 0;">Account Name: {{ bank_account_name }}</p>{% endif %}
+      <p style="margin:2px 0;">Account Number: {{ bank_account_number }}</p>
+      {% if bank_ifsc %}<p style="margin:2px 0;">IFSC: {{ bank_ifsc }}</p>{% endif %}
+      {% if bank_name %}<p style="margin:2px 0;">Bank: {{ bank_name }}</p>{% endif %}
+    </div>
+    {% endif %}
+    <p class="alert alert--info" style="margin-top:14px;">
+      Please pay ₹{{ "%.0f"|format(order.total) }} using the details above, then send us a payment screenshot on WhatsApp — we'll confirm your order shortly. No need to wait on this page.
+    </p>
+  </div>
+  {% endif %}
+
+  <div class="hero__actions">
+    <a class="btn btn-whatsapp" href="{{ whatsapp_share_link }}" target="_blank" rel="noopener">{{ wa.whatsapp_icon(18) }} Send Order Details on WhatsApp</a>
+    <a class="btn btn-secondary" href="/track-order?order_number={{ order.order_number }}">Track This Order</a>
+    <a class="btn btn-outline" href="/shop">Continue Shopping</a>
+  </div>
+</div>
+{% endblock %}
