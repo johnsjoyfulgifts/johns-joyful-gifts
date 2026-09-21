@@ -106,8 +106,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 
 @app.get("/robots.txt", include_in_schema=False)
-def robots_txt():
-    return PlainTextResponse("User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: /sitemap.xml\n")
+def robots_txt(request: Request):
+    base_url = str(request.base_url).rstrip("/")
+    return PlainTextResponse(f"User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: {base_url}/sitemap.xml\n")
 
 
 @app.get("/sw.js", include_in_schema=False)
