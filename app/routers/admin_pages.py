@@ -62,6 +62,15 @@ ORDER_STATUSES = [s.value for s in OrderStatus]
 MIN_PRODUCT_IMAGES = 4
 MAX_PRODUCT_IMAGES = 6
 
+
+def _clean_optional_text(value: str) -> str | None:
+    """Strip a form field to None, also treating a literal "none" as blank
+    (guards against the stringified-None data bug in product text fields)."""
+    value = value.strip()
+    if not value or value.lower() == "none":
+        return None
+    return value
+
 # Section-scoped access: Super Admin always passes require_role(...)
 # regardless of which roles are listed. require_super_admin lists none, so
 # only Super Admin gets through.
@@ -606,10 +615,10 @@ async def product_new_submit(
     product = Product(
         name=name,
         slug=unique_slug(db, Product, name),
-        description=description or None,
-        short_description=short_description or None,
-        meta_title=meta_title.strip() or None,
-        meta_description=meta_description.strip() or None,
+        description=_clean_optional_text(description),
+        short_description=_clean_optional_text(short_description),
+        meta_title=_clean_optional_text(meta_title),
+        meta_description=_clean_optional_text(meta_description),
         category_id=int(category_id) if category_id else None,
         base_price=base_price,
         gst_percent=gst_percent,
@@ -754,10 +763,10 @@ async def product_edit_submit(
         changes.append("discount changed")
 
     product.name = name
-    product.description = description or None
-    product.short_description = short_description or None
-    product.meta_title = meta_title.strip() or None
-    product.meta_description = meta_description.strip() or None
+    product.description = _clean_optional_text(description)
+    product.short_description = _clean_optional_text(short_description)
+    product.meta_title = _clean_optional_text(meta_title)
+    product.meta_description = _clean_optional_text(meta_description)
     product.category_id = int(category_id) if category_id else None
     product.base_price = base_price
     product.gst_percent = gst_percent
