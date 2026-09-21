@@ -82,18 +82,36 @@
 
     <div class="form-row form-row--3">
       <div class="form-group">
-        <label for="price">Price (₹) *</label>
-        <input class="form-control" id="price" type="number" step="0.01" min="0" name="price" value="{{ product.price if product else '' }}" required>
+        <label for="base_price">Actual/Base Price (₹) *</label>
+        <input class="form-control" id="base_price" type="number" step="0.01" min="0" name="base_price" value="{{ product.base_price if product else '' }}" required>
+        <p class="field-hint">Price before GST.</p>
       </div>
       <div class="form-group">
-        <label for="original_price">Original Price (₹)</label>
-        <input class="form-control" id="original_price" type="number" step="0.01" min="0" name="original_price" value="{{ product.original_price if product and product.original_price else '' }}">
-        <p class="field-hint">Optional — set higher than price to show a discount.</p>
+        <label for="gst_percent">GST %</label>
+        <input class="form-control" id="gst_percent" type="number" step="0.01" min="0" max="100" name="gst_percent" list="gst-percent-options" value="{{ product.gst_percent if product else 0 }}">
+        <datalist id="gst-percent-options">
+          <option value="0"><option value="5"><option value="12"><option value="18"><option value="28">
+        </datalist>
+        <p class="field-hint">Pick a slab or type any percentage.</p>
       </div>
       <div class="form-group">
         <label for="stock">Stock *</label>
         <input class="form-control" id="stock" type="number" min="0" name="stock" value="{{ product.stock if product else 0 }}" required>
       </div>
+    </div>
+
+    <div class="form-group" style="background:var(--color-bg-subtle,#f7f7f7); border-radius:8px; padding:10px 14px;">
+      <div class="flex gap-8" style="flex-wrap:wrap; font-size:0.9rem;">
+        <span>GST Amount: <strong id="gst-amount-preview">₹0.00</strong></span>
+        <span>Final Selling Price: <strong id="final-price-preview">₹0.00</strong></span>
+      </div>
+      <p class="field-hint" style="margin-bottom:0;">Calculated automatically from Base Price + GST % — this is what customers pay.</p>
+    </div>
+
+    <div class="form-group">
+      <label for="original_price">Original Price (₹)</label>
+      <input class="form-control" id="original_price" type="number" step="0.01" min="0" name="original_price" value="{{ product.original_price if product and product.original_price else '' }}">
+      <p class="field-hint">Optional — set higher than the final selling price to show a strikethrough discount.</p>
     </div>
 
     <div class="form-group">
@@ -168,6 +186,27 @@
   var isEdit = {{ 'true' if product else 'false' }};
 
   var form = document.getElementById('product-form');
+
+  // ---- Live GST Amount / Final Selling Price preview (display only — the
+  // server always recomputes these from base_price + gst_percent itself) ----
+  var basePriceInput = document.getElementById('base_price');
+  var gstPercentInput = document.getElementById('gst_percent');
+  var gstAmountPreview = document.getElementById('gst-amount-preview');
+  var finalPricePreview = document.getElementById('final-price-preview');
+
+  function updatePricePreview() {
+    var base = parseFloat(basePriceInput.value) || 0;
+    var gstPct = parseFloat(gstPercentInput.value) || 0;
+    var gstAmount = Math.round(base * gstPct / 100 * 100) / 100;
+    var finalPrice = Math.round((base + gstAmount) * 100) / 100;
+    gstAmountPreview.textContent = '₹' + gstAmount.toFixed(2);
+    finalPricePreview.textContent = '₹' + finalPrice.toFixed(2);
+  }
+
+  basePriceInput.addEventListener('input', updatePricePreview);
+  gstPercentInput.addEventListener('input', updatePricePreview);
+  updatePricePreview();
+
   var grid = document.getElementById('existing-images-grid');
   var orderInput = document.getElementById('image-order-input');
   var previewGrid = document.getElementById('new-image-previews');

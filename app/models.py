@@ -83,6 +83,15 @@ class Product(Base):
     slug: Mapped[str] = mapped_column(String(220), unique=True, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     short_description: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # `price` is always the final, GST-inclusive selling price — every
+    # existing call site (cart, checkout, product listings, order totals)
+    # reads this one field, so GST support was added without touching any
+    # of them. `base_price` is what the admin actually enters; `price` is
+    # then computed server-side as base_price + gst_amount (see
+    # admin_pages.product_new_submit/product_edit_submit) and never taken
+    # directly from the form.
+    base_price: Mapped[float] = mapped_column(Float)
+    gst_percent: Mapped[float] = mapped_column(Float, default=0)
     price: Mapped[float] = mapped_column(Float)
     original_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     category_id: Mapped[int | None] = mapped_column(
@@ -117,6 +126,14 @@ class Product(Base):
         back_populates="product", cascade="all, delete-orphan", order_by="ProductImage.sort_order"
     )
     collections: Mapped[list["Collection"]] = relationship(secondary=product_collections, back_populates="products")
+
+    @property
+    def gst_amount(self) -> float:
+        """Derived from the two stored, authoritative fields rather than
+        recomputed from gst_percent, so it's always exactly consistent with
+        `price` (= base_price + gst_amount) even if rounding ever nudges one
+        of them independently."""
+        return round(self.price - self.base_price, 2)
 
     @property
     def discount_percent(self) -> int | None:
@@ -237,6 +254,14 @@ class OrderItem(Base):
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
     product_name_snapshot: Mapped[str] = mapped_column(String(200))
+    # price_snapshot is the final (GST-inclusive) unit price actually
+    # charged — unchanged from before GST support, still what subtotal is
+    # computed from. base_price/gst_percent/gst_amount snapshot the GST
+    # breakdown behind that price at the moment of purchase, so a later
+    # change to the product's price or GST rate never rewrites this order.
+    base_price_snapshot: Mapped[float] = mapped_column(Float)
+    gst_percent_snapshot: Mapped[float] = mapped_column(Float, default=0)
+    gst_amount_snapshot: Mapped[float] = mapped_column(Float, default=0)
     price_snapshot: Mapped[float] = mapped_column(Float)
     quantity: Mapped[int] = mapped_column(Integer)
     subtotal: Mapped[float] = mapped_column(Float)

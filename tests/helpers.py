@@ -37,12 +37,16 @@ def checkout_cookies(items: dict, customer_id: int) -> dict:
     return cookies
 
 
-def make_product(db, name="Test Product", price=100.0, stock=5, active=True, **kwargs):
+def make_product(db, name="Test Product", price=100.0, stock=5, active=True, base_price=None, gst_percent=0, **kwargs):
     from app.utils.slugs import unique_slug
 
+    # Mirrors how existing pre-GST products were migrated: base_price ==
+    # price at 0% GST unless a test explicitly wants a GST-priced product.
     product = Product(
         name=name,
         slug=unique_slug(db, Product, name),
+        base_price=base_price if base_price is not None else price,
+        gst_percent=gst_percent,
         price=price,
         stock=stock,
         active=active,

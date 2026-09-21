@@ -29,7 +29,7 @@
 {% if products %}
 <div class="admin-table-wrap">
   <table class="admin-table">
-    <thead><tr><th>Image</th><th>Name</th><th>SKU</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Image</th><th>Name</th><th>SKU</th><th>Category</th><th>Base Price</th><th>GST %</th><th>Final Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead>
     <tbody>
       {% for p in products %}
       <tr>
@@ -37,7 +37,9 @@
         <td>{{ p.name }}</td>
         <td class="text-muted">{{ p.sku or '—' }}</td>
         <td class="text-muted">{{ p.category.name if p.category else '—' }}</td>
-        <td>₹{{ "%.0f"|format(p.price) }}</td>
+        <td>₹{{ "%.2f"|format(p.base_price) }}</td>
+        <td class="text-muted">{{ "%.0f"|format(p.gst_percent) }}%</td>
+        <td><strong>₹{{ "%.2f"|format(p.price) }}</strong></td>
         <td>{% if p.stock <= 0 %}<span class="badge badge--danger">0</span>{% elif p.stock <= (store.low_stock_threshold|int) %}<span class="badge badge--warning">{{ p.stock }}</span>{% else %}{{ p.stock }}{% endif %}</td>
         <td>{% if p.active %}<span class="badge badge--success">Active</span>{% else %}<span class="badge badge--muted">Inactive</span>{% endif %}</td>
         <td>
@@ -59,7 +61,7 @@
       <div class="thumb-preview" style="width:56px;height:56px;flex-shrink:0;">{% if p.primary_image %}<img src="{{ p.primary_image.display_thumbnail }}" alt="" loading="lazy">{% endif %}</div>
       <div style="flex:1;">
         <strong>{{ p.name }}</strong>
-        <div class="text-muted" style="font-size:0.8rem;">{{ p.sku or '—' }} · ₹{{ "%.0f"|format(p.price) }} · Stock: {{ p.stock }}</div>
+        <div class="text-muted" style="font-size:0.8rem;">{{ p.sku or '—' }} · ₹{{ "%.2f"|format(p.price) }} (incl. {{ "%.0f"|format(p.gst_percent) }}% GST) · Stock: {{ p.stock }}</div>
       </div>
       {% if p.active %}<span class="badge badge--success">Active</span>{% else %}<span class="badge badge--muted">Inactive</span>{% endif %}
     </div>

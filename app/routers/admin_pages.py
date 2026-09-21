@@ -551,7 +551,8 @@ async def product_new_submit(
     meta_title: str = Form(""),
     meta_description: str = Form(""),
     category_id: str = Form(""),
-    price: float = Form(...),
+    base_price: float = Form(...),
+    gst_percent: float = Form(0),
     original_price: str = Form(""),
     stock: int = Form(0),
     sku: str = Form(""),
@@ -574,8 +575,10 @@ async def product_new_submit(
     error = None
     if not name:
         error = "Product name is required."
-    elif price < 0:
+    elif base_price < 0:
         error = "Price cannot be negative."
+    elif gst_percent < 0 or gst_percent > 100:
+        error = "GST % must be between 0 and 100."
     elif stock < 0:
         error = "Stock cannot be negative."
     elif sku and db.query(Product).filter(Product.sku == sku).first() is not None:
@@ -597,6 +600,9 @@ async def product_new_submit(
                 delete_product_image(url, thumb_url)
             return render_admin(request, "admin/product_form.html", _product_form_context(db, error=exc.detail), db, status_code=400)
 
+    gst_amount = round(base_price * gst_percent / 100, 2)
+    final_price = round(base_price + gst_amount, 2)
+
     product = Product(
         name=name,
         slug=unique_slug(db, Product, name),
@@ -605,7 +611,9 @@ async def product_new_submit(
         meta_title=meta_title.strip() or None,
         meta_description=meta_description.strip() or None,
         category_id=int(category_id) if category_id else None,
-        price=price,
+        base_price=base_price,
+        gst_percent=gst_percent,
+        price=final_price,
         original_price=float(original_price) if original_price else None,
         stock=stock,
         sku=sku,
@@ -655,7 +663,8 @@ async def product_edit_submit(
     meta_title: str = Form(""),
     meta_description: str = Form(""),
     category_id: str = Form(""),
-    price: float = Form(...),
+    base_price: float = Form(...),
+    gst_percent: float = Form(0),
     original_price: str = Form(""),
     stock: int = Form(0),
     sku: str = Form(""),
@@ -685,8 +694,10 @@ async def product_edit_submit(
     error = None
     if not name:
         error = "Product name is required."
-    elif price < 0:
+    elif base_price < 0:
         error = "Price cannot be negative."
+    elif gst_percent < 0 or gst_percent > 100:
+        error = "GST % must be between 0 and 100."
     elif stock < 0:
         error = "Stock cannot be negative."
     elif sku and db.query(Product).filter(Product.sku == sku, Product.id != product.id).first() is not None:
@@ -726,14 +737,19 @@ async def product_edit_submit(
     if name != product.name:
         product.slug = unique_slug(db, Product, name, exclude_id=product.id)
 
+    gst_amount = round(base_price * gst_percent / 100, 2)
+    final_price = round(base_price + gst_amount, 2)
+
     # Compare before overwriting, so the audit log records exactly which
     # fields actually changed rather than just "product updated".
     new_original_price = float(original_price) if original_price else None
     changes = []
     if stock != product.stock:
         changes.append(f"stock {product.stock} → {stock}")
-    if price != product.price:
-        changes.append(f"price ₹{product.price:.2f} → ₹{price:.2f}")
+    if final_price != product.price:
+        changes.append(f"price ₹{product.price:.2f} → ₹{final_price:.2f}")
+    if gst_percent != product.gst_percent:
+        changes.append(f"GST {product.gst_percent:.0f}% → {gst_percent:.0f}%")
     if new_original_price != product.original_price:
         changes.append("discount changed")
 
@@ -743,7 +759,9 @@ async def product_edit_submit(
     product.meta_title = meta_title.strip() or None
     product.meta_description = meta_description.strip() or None
     product.category_id = int(category_id) if category_id else None
-    product.price = price
+    product.base_price = base_price
+    product.gst_percent = gst_percent
+    product.price = final_price
     product.original_price = float(original_price) if original_price else None
     product.stock = stock
     if not product.sku:
@@ -825,6 +843,8 @@ def product_duplicate(product_id: int, db: Session = Depends(get_db), admin: Adm
         description=original.description,
         short_description=original.short_description,
         category_id=original.category_id,
+        base_price=original.base_price,
+        gst_percent=original.gst_percent,
         price=original.price,
         original_price=original.original_price,
         stock=0,

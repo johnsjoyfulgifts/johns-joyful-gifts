@@ -121,6 +121,11 @@
           <span class="price--discount">{{ product.discount_percent }}% off</span>
         {% endif %}
       </div>
+      {% if product.gst_percent %}
+      <p class="text-muted" style="font-size:0.8rem; margin:-8px 0 12px;">
+        Inclusive of GST — Base Price ₹{{ "%.2f"|format(product.base_price) }} + GST ({{ "%.0f"|format(product.gst_percent) }}%) ₹{{ "%.2f"|format(product.gst_amount) }}
+      </p>
+      {% endif %}
 
       {% if not product.in_stock %}
         <p class="badge badge--danger">Out of Stock</p>

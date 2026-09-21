@@ -9,6 +9,9 @@
       <h2 style="font-size:1rem; margin-top:0;">Items</h2>
       {% for item in order.items %}
       <div class="cart-summary-row"><span>{{ item.product_name_snapshot }} × {{ item.quantity }}</span><span>₹{{ "%.0f"|format(item.subtotal) }}</span></div>
+      <p class="text-muted" style="font-size:0.78rem; margin:-4px 0 8px;">
+        Base ₹{{ "%.2f"|format(item.base_price_snapshot) }} + GST ({{ "%.0f"|format(item.gst_percent_snapshot) }}%) ₹{{ "%.2f"|format(item.gst_amount_snapshot) }} = ₹{{ "%.2f"|format(item.price_snapshot) }} each
+      </p>
       {% if item.has_personalization %}
       <div class="alert alert--info" style="margin:-2px 0 10px; font-size:0.85rem;">
         <strong>🎁 Personalize before packing:</strong>

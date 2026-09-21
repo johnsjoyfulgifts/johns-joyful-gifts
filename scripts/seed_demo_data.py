@@ -112,6 +112,8 @@ def main():
                 slug=slug,
                 short_description=item["short_description"],
                 category_id=categories_by_name[item["category"]].id,
+                base_price=item["price"],
+                gst_percent=0,
                 price=item["price"],
                 original_price=item.get("original_price"),
                 stock=item["stock"],
